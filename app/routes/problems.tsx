@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { getProblemsForContest } from "~/lib/db/problems.server";
-import { getScoreboard } from "~/lib/mock-data";
+import { getScoreboard } from "~/lib/db/scoreboard.server";
 import { getMaxScore } from "~/types/database";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -37,7 +37,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { isUserInActiveContest } = await import("~/lib/contest.server");
 
   const session = await requireAuth(request);
-  const contestStatus = isUserInActiveContest(session.username);
+  const contestStatus = await isUserInActiveContest(session.username);
 
   // If not in active contest, return empty state
   if (!contestStatus.active) {
@@ -55,7 +55,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   // Get user's scores from scoreboard
-  const scoreboard = getScoreboard(contestStatus.contest!.contestId);
+  const scoreboard = await getScoreboard(contestStatus.contest!.contestId);
   const userScores = scoreboard.find(s => s.username === session.username);
 
   // Only show problems that are in this contest

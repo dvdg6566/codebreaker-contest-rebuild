@@ -1,20 +1,20 @@
 /**
  * Problems Database Service
  *
- * Provides CRUD operations for problems.
- * Switches between mock data and DynamoDB based on USE_DYNAMODB env var.
+ * Provides CRUD operations for problems using DynamoDB.
  */
 
 import type { Problem, ProblemType } from "~/types/database";
 import { DEFAULT_PROBLEM, getMaxScore } from "~/types/database";
-
-const USE_DYNAMODB = process.env.USE_DYNAMODB === "true";
-
-const dynamodb = USE_DYNAMODB
-  ? await import("./dynamodb/problems.server")
-  : null;
-
-import { mockProblems, getProblemById } from "../mock-data";
+import {
+  docClient,
+  TableNames,
+  GetCommand,
+  PutCommand,
+  UpdateCommand,
+  DeleteCommand,
+  ScanCommand,
+} from "./dynamodb-client.server";
 
 // Re-export utility
 export { getMaxScore };
@@ -23,10 +23,12 @@ export { getMaxScore };
  * Get all problems
  */
 export async function listProblems(): Promise<Problem[]> {
-  if (dynamodb) {
-    return dynamodb.listProblems();
-  }
-  return mockProblems;
+  const result = await docClient.send(
+    new ScanCommand({
+      TableName: TableNames.problems,
+    })
+  );
+  return (result.Items || []) as Problem[];
 }
 
 /**
@@ -41,10 +43,13 @@ export async function listValidatedProblems(): Promise<Problem[]> {
  * Get a problem by name
  */
 export async function getProblem(problemName: string): Promise<Problem | null> {
-  if (dynamodb) {
-    return dynamodb.getProblem(problemName);
-  }
-  return getProblemById(problemName);
+  const result = await docClient.send(
+    new GetCommand({
+      TableName: TableNames.problems,
+      Key: { problemName },
+    })
+  );
+  return (result.Item as Problem) || null;
 }
 
 /**
@@ -84,18 +89,22 @@ export async function createProblem(
   problemName: string,
   data?: Partial<Problem>
 ): Promise<Problem> {
-  if (dynamodb) {
-    return dynamodb.createProblem(problemName, data);
-  }
-  const newProblem: Problem = {
+  const problem: Problem = {
     ...DEFAULT_PROBLEM,
+    ...data,
     problemName,
     title: data?.title || problemName,
-    ...data,
   };
 
-  mockProblems.push(newProblem);
-  return newProblem;
+  await docClient.send(
+    new PutCommand({
+      TableName: TableNames.problems,
+      Item: problem,
+      ConditionExpression: "attribute_not_exists(problemName)",
+    })
+  );
+
+  return problem;
 }
 
 /**
@@ -103,39 +112,50 @@ export async function createProblem(
  */
 export async function updateProblem(
   problemName: string,
-  updates: Partial<Problem>
+  updates: Partial<Omit<Problem, "problemName">>
 ): Promise<Problem | null> {
-  // Don't allow changing problemName (primary key)
-  const { problemName: _, ...safeUpdates } = updates as Problem & {
-    problemName?: string;
-  };
+  const updateParts: string[] = [];
+  const expressionNames: Record<string, string> = {};
+  const expressionValues: Record<string, unknown> = {};
 
-  if (dynamodb) {
-    return dynamodb.updateProblem(problemName, safeUpdates);
+  Object.entries(updates).forEach(([key, value], index) => {
+    if (value !== undefined) {
+      const attrName = `#attr${index}`;
+      const attrValue = `:val${index}`;
+      updateParts.push(`${attrName} = ${attrValue}`);
+      expressionNames[attrName] = key;
+      expressionValues[attrValue] = value;
+    }
+  });
+
+  if (updateParts.length === 0) {
+    return getProblem(problemName);
   }
 
-  const index = mockProblems.findIndex((p) => p.problemName === problemName);
-  if (index === -1) return null;
+  const result = await docClient.send(
+    new UpdateCommand({
+      TableName: TableNames.problems,
+      Key: { problemName },
+      UpdateExpression: `SET ${updateParts.join(", ")}`,
+      ExpressionAttributeNames: expressionNames,
+      ExpressionAttributeValues: expressionValues,
+      ReturnValues: "ALL_NEW",
+    })
+  );
 
-  mockProblems[index] = {
-    ...mockProblems[index],
-    ...safeUpdates,
-  };
-
-  return mockProblems[index];
+  return (result.Attributes as Problem) || null;
 }
 
 /**
  * Delete a problem
  */
 export async function deleteProblem(problemName: string): Promise<boolean> {
-  if (dynamodb) {
-    return dynamodb.deleteProblem(problemName);
-  }
-  const index = mockProblems.findIndex((p) => p.problemName === problemName);
-  if (index === -1) return false;
-
-  mockProblems.splice(index, 1);
+  await docClient.send(
+    new DeleteCommand({
+      TableName: TableNames.problems,
+      Key: { problemName },
+    })
+  );
   return true;
 }
 
@@ -153,9 +173,6 @@ export async function problemExists(problemName: string): Promise<boolean> {
 export async function validateProblem(
   problemName: string
 ): Promise<Problem | null> {
-  if (dynamodb) {
-    return dynamodb.validateProblem(problemName);
-  }
   return updateProblem(problemName, { validated: true });
 }
 
@@ -165,9 +182,6 @@ export async function validateProblem(
 export async function invalidateProblem(
   problemName: string
 ): Promise<Problem | null> {
-  if (dynamodb) {
-    return dynamodb.invalidateProblem(problemName);
-  }
   return updateProblem(problemName, { validated: false });
 }
 
@@ -177,10 +191,18 @@ export async function invalidateProblem(
 export async function getProblemsForContest(
   problemNames: string[]
 ): Promise<Problem[]> {
-  if (dynamodb) {
-    return dynamodb.getProblemsForContest(problemNames);
+  if (problemNames.length === 0) return [];
+
+  const problems: Problem[] = [];
+  for (const problemName of problemNames) {
+    const problem = await getProblem(problemName);
+    if (problem) problems.push(problem);
   }
-  return mockProblems.filter((p) => problemNames.includes(p.problemName));
+
+  // Return in the same order as the input
+  return problemNames
+    .map((name) => problems.find((p) => p.problemName === name))
+    .filter((p): p is Problem => p !== undefined);
 }
 
 /**

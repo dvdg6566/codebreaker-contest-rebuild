@@ -28,7 +28,7 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { cn } from "~/lib/utils";
-import { getScoreboard } from "~/lib/mock-data";
+import { getScoreboard } from "~/lib/db/scoreboard.server";
 import { getProblemsForContest } from "~/lib/db/problems.server";
 import { format } from "date-fns";
 
@@ -37,7 +37,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { isUserInActiveContest } = await import("~/lib/contest.server");
 
   const session = await requireAuth(request);
-  const contestStatus = isUserInActiveContest(session.username);
+  const contestStatus = await isUserInActiveContest(session.username);
 
   // If not in active contest, return empty state
   if (!contestStatus.active || !contestStatus.contest) {
@@ -67,7 +67,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 
   // Build participants from scoreboard
-  const scoreboard = getScoreboard(contest.contestId);
+  const scoreboard = await getScoreboard(contest.contestId);
   const participants = scoreboard.map((entry) => {
     const scores: Record<string, number | string> = {};
     contestInfo.problems.forEach((letter, index) => {

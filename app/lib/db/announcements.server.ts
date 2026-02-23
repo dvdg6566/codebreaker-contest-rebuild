@@ -1,44 +1,49 @@
 /**
  * Announcements Database Service
  *
- * Provides CRUD operations for announcements.
- * Switches between mock data and DynamoDB based on USE_DYNAMODB env var.
+ * Provides CRUD operations for announcements using DynamoDB.
  */
 
 import type { Announcement } from "~/types/database";
 import { formatDateTime } from "~/types/database";
-
-const USE_DYNAMODB = process.env.USE_DYNAMODB === "true";
-
-const dynamodb = USE_DYNAMODB
-  ? await import("./dynamodb/announcements.server")
-  : null;
-
-import { mockAnnouncements } from "../mock-data";
-
-// Counter for generating IDs (mock mode only)
-let announcementIdCounter = mockAnnouncements.length;
+import {
+  docClient,
+  TableNames,
+  GetCommand,
+  PutCommand,
+  UpdateCommand,
+  DeleteCommand,
+  ScanCommand,
+} from "./dynamodb-client.server";
 
 /**
- * Get all announcements
+ * Generate a UUID for announcements
+ */
+function generateAnnouncementId(): string {
+  return crypto.randomUUID();
+}
+
+/**
+ * Get all announcements (sorted by time, newest first)
  */
 export async function listAnnouncements(): Promise<Announcement[]> {
-  if (dynamodb) {
-    return dynamodb.listAnnouncements();
-  }
-  return mockAnnouncements;
+  const result = await docClient.send(
+    new ScanCommand({
+      TableName: TableNames.announcements,
+    })
+  );
+
+  const items = (result.Items || []) as Announcement[];
+  return items.sort((a, b) =>
+    b.announcementTime.localeCompare(a.announcementTime)
+  );
 }
 
 /**
  * Get announcements ordered by time (newest first)
  */
 export async function listAnnouncementsByTime(): Promise<Announcement[]> {
-  if (dynamodb) {
-    return dynamodb.listAnnouncements(); // Already sorted
-  }
-  return [...mockAnnouncements].sort((a, b) =>
-    b.announcementTime.localeCompare(a.announcementTime)
-  );
+  return listAnnouncements();
 }
 
 /**
@@ -47,12 +52,13 @@ export async function listAnnouncementsByTime(): Promise<Announcement[]> {
 export async function getAnnouncement(
   announcementId: string
 ): Promise<Announcement | null> {
-  if (dynamodb) {
-    return dynamodb.getAnnouncement(announcementId);
-  }
-  return (
-    mockAnnouncements.find((a) => a.announcementId === announcementId) || null
+  const result = await docClient.send(
+    new GetCommand({
+      TableName: TableNames.announcements,
+      Key: { announcementId },
+    })
   );
+  return (result.Item as Announcement) || null;
 }
 
 /**
@@ -74,21 +80,23 @@ export async function createAnnouncement(
   author?: string,
   priority?: "low" | "normal" | "high"
 ): Promise<Announcement> {
-  if (dynamodb) {
-    return dynamodb.createAnnouncement(title, text, author, priority);
-  }
-
-  const newAnnouncement: Announcement = {
-    announcementId: `ann-${++announcementIdCounter}`,
+  const announcement: Announcement = {
+    announcementId: generateAnnouncementId(),
     title,
     text,
     announcementTime: formatDateTime(new Date()),
-    priority: priority || "normal",
     author,
+    priority,
   };
 
-  mockAnnouncements.push(newAnnouncement);
-  return newAnnouncement;
+  await docClient.send(
+    new PutCommand({
+      TableName: TableNames.announcements,
+      Item: announcement,
+    })
+  );
+
+  return announcement;
 }
 
 /**
@@ -96,28 +104,38 @@ export async function createAnnouncement(
  */
 export async function updateAnnouncement(
   announcementId: string,
-  updates: Partial<Announcement>
+  updates: Partial<Omit<Announcement, "announcementId">>
 ): Promise<Announcement | null> {
-  // Don't allow changing announcementId (primary key)
-  const { announcementId: _, ...safeUpdates } = updates as Announcement & {
-    announcementId?: string;
-  };
+  const updateParts: string[] = [];
+  const expressionNames: Record<string, string> = {};
+  const expressionValues: Record<string, unknown> = {};
 
-  if (dynamodb) {
-    return dynamodb.updateAnnouncement(announcementId, safeUpdates);
+  Object.entries(updates).forEach(([key, value], index) => {
+    if (value !== undefined) {
+      const attrName = `#attr${index}`;
+      const attrValue = `:val${index}`;
+      updateParts.push(`${attrName} = ${attrValue}`);
+      expressionNames[attrName] = key;
+      expressionValues[attrValue] = value;
+    }
+  });
+
+  if (updateParts.length === 0) {
+    return getAnnouncement(announcementId);
   }
 
-  const index = mockAnnouncements.findIndex(
-    (a) => a.announcementId === announcementId
+  const result = await docClient.send(
+    new UpdateCommand({
+      TableName: TableNames.announcements,
+      Key: { announcementId },
+      UpdateExpression: `SET ${updateParts.join(", ")}`,
+      ExpressionAttributeNames: expressionNames,
+      ExpressionAttributeValues: expressionValues,
+      ReturnValues: "ALL_NEW",
+    })
   );
-  if (index === -1) return null;
 
-  mockAnnouncements[index] = {
-    ...mockAnnouncements[index],
-    ...safeUpdates,
-  };
-
-  return mockAnnouncements[index];
+  return (result.Attributes as Announcement) || null;
 }
 
 /**
@@ -126,16 +144,12 @@ export async function updateAnnouncement(
 export async function deleteAnnouncement(
   announcementId: string
 ): Promise<boolean> {
-  if (dynamodb) {
-    return dynamodb.deleteAnnouncement(announcementId);
-  }
-
-  const index = mockAnnouncements.findIndex(
-    (a) => a.announcementId === announcementId
+  await docClient.send(
+    new DeleteCommand({
+      TableName: TableNames.announcements,
+      Key: { announcementId },
+    })
   );
-  if (index === -1) return false;
-
-  mockAnnouncements.splice(index, 1);
   return true;
 }
 

@@ -1,9 +1,20 @@
-// Mock authentication for development without AWS
+// Mock authentication for development without AWS Cognito
+// Uses DynamoDB for user data, but handles passwords locally for dev mode
 import type { UserRole } from "~/types/database";
-import { mockUsers, type MockUser } from "./mock-data";
+import {
+  getUser as dbGetUser,
+  listUsers as dbListUsers,
+  createUser as dbCreateUser,
+  updateUser as dbUpdateUser,
+  deleteUser as dbDeleteUser,
+} from "./db/users.server";
 
 // Re-export UserRole for backwards compatibility
 export type { UserRole };
+
+// Default password for mock authentication
+// In development, all users can log in with this password or their username + "123"
+const DEFAULT_PASSWORD = "password123";
 
 export interface MockAuthResult {
   accessToken: string;
@@ -21,36 +32,45 @@ export interface MockCognitoUser {
 }
 
 // Simple token generation for mock purposes
-function generateMockToken(username: string, role: UserRole): string {
+function generateMockToken(username: string, role: UserRole, email?: string): string {
   const payload = {
     sub: username,
     "cognito:username": username,
     "cognito:groups": [role],
-    email: mockUsers.find((u) => u.username === username)?.email,
+    email: email,
     exp: Math.floor(Date.now() / 1000) + 3600,
   };
   return Buffer.from(JSON.stringify(payload)).toString("base64");
 }
 
 /**
- * Mock authenticate - validates against mock users
+ * Check if password is valid for mock authentication
+ * Accepts: default password, or username + "123"
+ */
+function isValidMockPassword(username: string, password: string): boolean {
+  return password === DEFAULT_PASSWORD || password === `${username}123`;
+}
+
+/**
+ * Mock authenticate - validates against DynamoDB users with simple password check
  */
 export async function authenticate(
   username: string,
   password: string
 ): Promise<MockAuthResult> {
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 100));
-
-  const user = mockUsers.find(
-    (u) => u.username === username && u.password === password
-  );
+  // Check if user exists in DynamoDB
+  const user = await dbGetUser(username);
 
   if (!user) {
     throw new Error("Invalid username or password");
   }
 
-  const token = generateMockToken(username, user.role);
+  // Validate password (simple check for dev mode)
+  if (!isValidMockPassword(username, password)) {
+    throw new Error("Invalid username or password");
+  }
+
+  const token = generateMockToken(username, user.role, user.email);
 
   return {
     accessToken: `mock-access-${token}`,
@@ -68,10 +88,10 @@ export async function refreshTokens(refreshToken: string): Promise<MockAuthResul
   const tokenData = refreshToken.replace("mock-refresh-", "");
   try {
     const payload = JSON.parse(Buffer.from(tokenData, "base64").toString());
-    const user = mockUsers.find((u) => u.username === payload.sub);
+    const user = await dbGetUser(payload.sub);
     if (!user) throw new Error("Invalid token");
 
-    const newToken = generateMockToken(user.username, user.role);
+    const newToken = generateMockToken(user.username, user.role, user.email);
     return {
       accessToken: `mock-access-${newToken}`,
       refreshToken: refreshToken,
@@ -84,7 +104,7 @@ export async function refreshTokens(refreshToken: string): Promise<MockAuthResul
 }
 
 /**
- * Mock create user
+ * Mock create user - creates in DynamoDB
  */
 export async function createUser(
   username: string,
@@ -92,18 +112,14 @@ export async function createUser(
   role: UserRole = "member",
   email?: string
 ): Promise<MockCognitoUser> {
-  await new Promise((resolve) => setTimeout(resolve, 100));
-
   // Check if user already exists
-  if (mockUsers.find((u) => u.username === username)) {
+  const existing = await dbGetUser(username);
+  if (existing) {
     throw new Error("User already exists");
   }
 
-  // Add to mock users (note: this won't persist across restarts)
-  mockUsers.push({
-    username,
-    password,
-    role,
+  // Create user in DynamoDB (password not stored - Cognito handles this in prod)
+  await dbCreateUser(username, role, {
     fullname: username,
     email: email || "",
     label: "",
@@ -124,43 +140,37 @@ export async function createUser(
 }
 
 /**
- * Mock delete user
+ * Mock delete user - deletes from DynamoDB
  */
 export async function deleteUser(username: string): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 100));
-
-  const index = mockUsers.findIndex((u) => u.username === username);
-  if (index === -1) {
+  const user = await dbGetUser(username);
+  if (!user) {
     throw new Error("User not found");
   }
 
-  mockUsers.splice(index, 1);
+  await dbDeleteUser(username);
 }
 
 /**
- * Mock change password
+ * Mock change password - no-op in mock mode (passwords aren't stored in DynamoDB)
  */
 export async function changePassword(
   username: string,
   newPassword: string
 ): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 100));
-
-  const user = mockUsers.find((u) => u.username === username);
+  const user = await dbGetUser(username);
   if (!user) {
     throw new Error("User not found");
   }
-
-  user.password = newPassword;
+  // No-op: passwords aren't stored in DynamoDB, Cognito handles this
+  console.log(`[Mock Auth] Password change requested for ${username} - no-op in mock mode`);
 }
 
 /**
- * Mock get user
+ * Mock get user - from DynamoDB
  */
 export async function getUser(username: string): Promise<MockCognitoUser | null> {
-  await new Promise((resolve) => setTimeout(resolve, 50));
-
-  const user = mockUsers.find((u) => u.username === username);
+  const user = await dbGetUser(username);
   if (!user) return null;
 
   return {
@@ -173,48 +183,48 @@ export async function getUser(username: string): Promise<MockCognitoUser | null>
 }
 
 /**
- * Mock get user role
+ * Mock get user role - from DynamoDB
  */
 export async function getUserRole(username: string): Promise<UserRole> {
-  const user = mockUsers.find((u) => u.username === username);
+  const user = await dbGetUser(username);
   return user?.role || "member";
 }
 
 /**
- * Mock update user role
+ * Mock update user role - in DynamoDB
  */
 export async function updateUserRole(
   username: string,
   newRole: UserRole
 ): Promise<void> {
-  const user = mockUsers.find((u) => u.username === username);
+  const user = await dbGetUser(username);
   if (!user) {
     throw new Error("User not found");
   }
-  user.role = newRole;
+  await dbUpdateUser(username, { role: newRole });
 }
 
 /**
- * Mock update user email
+ * Mock update user email - in DynamoDB
  */
 export async function updateUserEmail(
   username: string,
   email: string
 ): Promise<void> {
-  const user = mockUsers.find((u) => u.username === username);
+  const user = await dbGetUser(username);
   if (!user) {
     throw new Error("User not found");
   }
-  user.email = email;
+  await dbUpdateUser(username, { email });
 }
 
 /**
- * Mock list users
+ * Mock list users - from DynamoDB
  */
 export async function listUsers(): Promise<MockCognitoUser[]> {
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  const users = await dbListUsers();
 
-  return mockUsers.map((u) => ({
+  return users.map((u) => ({
     username: u.username,
     role: u.role,
     email: u.email,

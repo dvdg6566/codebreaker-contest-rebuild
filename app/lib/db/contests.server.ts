@@ -1,29 +1,20 @@
 /**
  * Contests Database Service
  *
- * Provides CRUD operations for contests.
- * Switches between mock data and DynamoDB based on USE_DYNAMODB env var.
+ * Provides CRUD operations for contests using DynamoDB.
  */
 
 import type { Contest, ContestStatus } from "~/types/database";
-import { parseDateTime, isDateTimeNotSet } from "~/types/database";
-
-const USE_DYNAMODB = process.env.USE_DYNAMODB === "true";
-
-// Conditionally import DynamoDB implementation
-const dynamodb = USE_DYNAMODB
-  ? await import("./dynamodb/contests.server")
-  : null;
-
-// Mock data imports
+import { DEFAULT_CONTEST, parseDateTime, isDateTimeNotSet } from "~/types/database";
 import {
-  mockContests,
-  getContestStatus as mockGetContestStatus,
-  getContestById,
-  updateContest as mockUpdateContest,
-  createContest as mockCreateContest,
-  deleteContest as mockDeleteContest,
-} from "../mock-data";
+  docClient,
+  TableNames,
+  GetCommand,
+  PutCommand,
+  UpdateCommand,
+  DeleteCommand,
+  ScanCommand,
+} from "./dynamodb-client.server";
 
 /**
  * Calculate contest status from start/end times
@@ -42,10 +33,12 @@ export function getContestStatus(contest: Contest): ContestStatus {
  * Get all contests
  */
 export async function listContests(): Promise<Contest[]> {
-  if (dynamodb) {
-    return dynamodb.listContests();
-  }
-  return mockContests;
+  const result = await docClient.send(
+    new ScanCommand({
+      TableName: TableNames.contests,
+    })
+  );
+  return (result.Items || []) as Contest[];
 }
 
 /**
@@ -54,12 +47,10 @@ export async function listContests(): Promise<Contest[]> {
 export async function listContestsWithStatus(): Promise<
   (Contest & { status: ContestStatus })[]
 > {
-  if (dynamodb) {
-    return dynamodb.listContestsWithStatus();
-  }
-  return mockContests.map((c) => ({
-    ...c,
-    status: getContestStatus(c),
+  const contests = await listContests();
+  return contests.map((contest) => ({
+    ...contest,
+    status: getContestStatus(contest),
   }));
 }
 
@@ -67,10 +58,13 @@ export async function listContestsWithStatus(): Promise<
  * Get a contest by ID
  */
 export async function getContest(contestId: string): Promise<Contest | null> {
-  if (dynamodb) {
-    return dynamodb.getContest(contestId);
-  }
-  return getContestById(contestId);
+  const result = await docClient.send(
+    new GetCommand({
+      TableName: TableNames.contests,
+      Key: { contestId },
+    })
+  );
+  return (result.Item as Contest) || null;
 }
 
 /**
@@ -112,13 +106,20 @@ export async function createContest(
   contestId: string,
   data?: Partial<Contest>
 ): Promise<Contest> {
-  if (dynamodb) {
-    return dynamodb.createContest(contestId, data);
-  }
-  const contest = mockCreateContest(contestId);
-  if (data) {
-    return (await updateContest(contestId, data)) || contest;
-  }
+  const contest: Contest = {
+    ...DEFAULT_CONTEST,
+    ...data,
+    contestId,
+  };
+
+  await docClient.send(
+    new PutCommand({
+      TableName: TableNames.contests,
+      Item: contest,
+      ConditionExpression: "attribute_not_exists(contestId)",
+    })
+  );
+
   return contest;
 }
 
@@ -127,27 +128,51 @@ export async function createContest(
  */
 export async function updateContest(
   contestId: string,
-  updates: Partial<Contest>
+  updates: Partial<Omit<Contest, "contestId">>
 ): Promise<Contest | null> {
-  // Don't allow changing contestId (primary key)
-  const { contestId: _, ...safeUpdates } = updates as Contest & {
-    contestId?: string;
-  };
+  const updateParts: string[] = [];
+  const expressionNames: Record<string, string> = {};
+  const expressionValues: Record<string, unknown> = {};
 
-  if (dynamodb) {
-    return dynamodb.updateContest(contestId, safeUpdates);
+  Object.entries(updates).forEach(([key, value], index) => {
+    if (value !== undefined) {
+      const attrName = `#attr${index}`;
+      const attrValue = `:val${index}`;
+      updateParts.push(`${attrName} = ${attrValue}`);
+      expressionNames[attrName] = key;
+      expressionValues[attrValue] = value;
+    }
+  });
+
+  if (updateParts.length === 0) {
+    return getContest(contestId);
   }
-  return mockUpdateContest(contestId, safeUpdates);
+
+  const result = await docClient.send(
+    new UpdateCommand({
+      TableName: TableNames.contests,
+      Key: { contestId },
+      UpdateExpression: `SET ${updateParts.join(", ")}`,
+      ExpressionAttributeNames: expressionNames,
+      ExpressionAttributeValues: expressionValues,
+      ReturnValues: "ALL_NEW",
+    })
+  );
+
+  return (result.Attributes as Contest) || null;
 }
 
 /**
  * Delete a contest
  */
 export async function deleteContest(contestId: string): Promise<boolean> {
-  if (dynamodb) {
-    return dynamodb.deleteContest(contestId);
-  }
-  return mockDeleteContest(contestId);
+  await docClient.send(
+    new DeleteCommand({
+      TableName: TableNames.contests,
+      Key: { contestId },
+    })
+  );
+  return true;
 }
 
 /**
@@ -165,17 +190,16 @@ export async function addProblemToContest(
   contestId: string,
   problemName: string
 ): Promise<Contest | null> {
-  if (dynamodb) {
-    return dynamodb.addProblemToContest(contestId, problemName);
-  }
-  const contest = getContestById(contestId);
+  const contest = await getContest(contestId);
   if (!contest) return null;
 
-  if (!contest.problems.includes(problemName)) {
-    contest.problems.push(problemName);
+  if (contest.problems.includes(problemName)) {
+    return contest;
   }
 
-  return contest;
+  return updateContest(contestId, {
+    problems: [...contest.problems, problemName],
+  });
 }
 
 /**
@@ -185,14 +209,12 @@ export async function removeProblemFromContest(
   contestId: string,
   problemName: string
 ): Promise<Contest | null> {
-  if (dynamodb) {
-    return dynamodb.removeProblemFromContest(contestId, problemName);
-  }
-  const contest = getContestById(contestId);
+  const contest = await getContest(contestId);
   if (!contest) return null;
 
-  contest.problems = contest.problems.filter((p) => p !== problemName);
-  return contest;
+  return updateContest(contestId, {
+    problems: contest.problems.filter((p) => p !== problemName),
+  });
 }
 
 /**
@@ -203,16 +225,15 @@ export async function addUserToContest(
   username: string,
   started: boolean = false
 ): Promise<Contest | null> {
-  if (dynamodb) {
-    return dynamodb.addUserToContest(contestId, username, started);
-  }
-  const contest = getContestById(contestId);
+  const contest = await getContest(contestId);
   if (!contest) return null;
 
-  if (!contest.users) contest.users = {};
-  contest.users[username] = started ? "1" : "0";
-
-  return contest;
+  return updateContest(contestId, {
+    users: {
+      ...contest.users,
+      [username]: started ? "1" : "0",
+    },
+  });
 }
 
 /**
@@ -222,14 +243,14 @@ export async function removeUserFromContest(
   contestId: string,
   username: string
 ): Promise<Contest | null> {
-  if (dynamodb) {
-    return dynamodb.removeUserFromContest(contestId, username);
-  }
-  const contest = getContestById(contestId);
-  if (!contest || !contest.users) return null;
+  const contest = await getContest(contestId);
+  if (!contest) return null;
 
-  delete contest.users[username];
-  return contest;
+  const { [username]: _, ...remainingUsers } = contest.users || {};
+
+  return updateContest(contestId, {
+    users: remainingUsers,
+  });
 }
 
 /**
@@ -251,19 +272,22 @@ export async function updateContestScore(
   problemName: string,
   score: number
 ): Promise<Contest | null> {
-  if (dynamodb) {
-    await dynamodb.updateContestScore(contestId, username, problemName, score);
-    return dynamodb.getContest(contestId);
-  }
-  const contest = getContestById(contestId);
+  const contest = await getContest(contestId);
   if (!contest) return null;
 
-  if (!contest.scores) contest.scores = {};
-  if (!contest.scores[username]) contest.scores[username] = {};
+  const userScores = contest.scores?.[username] || {};
+  const currentScore = userScores[problemName] || 0;
 
-  const currentScore = contest.scores[username][problemName] || 0;
   if (score > currentScore) {
-    contest.scores[username][problemName] = score;
+    return updateContest(contestId, {
+      scores: {
+        ...contest.scores,
+        [username]: {
+          ...userScores,
+          [problemName]: score,
+        },
+      },
+    });
   }
 
   return contest;
@@ -273,8 +297,6 @@ export async function updateContestScore(
  * Get the active/ongoing contest
  */
 export async function getActiveContest(): Promise<Contest | null> {
-  if (dynamodb) {
-    return dynamodb.getActiveContest();
-  }
-  return mockContests.find((c) => getContestStatus(c) === "ONGOING") || null;
+  const contests = await listContestsWithStatus();
+  return contests.find((c) => c.status === "ONGOING") || null;
 }

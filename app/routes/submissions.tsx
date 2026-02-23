@@ -42,7 +42,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { isUserInActiveContest } = await import("~/lib/contest.server");
 
   const session = await requireAuth(request);
-  const contestStatus = isUserInActiveContest(session.username);
+  const contestStatus = await isUserInActiveContest(session.username);
 
   // If not in active contest, return empty state
   if (!contestStatus.active) {
@@ -62,7 +62,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   );
 
   // Transform to display format
-  const submissions = userSubmissions.map(formatSubmissionForDisplay);
+  const submissions = await Promise.all(userSubmissions.map(formatSubmissionForDisplay));
 
   const problems = await getProblemsForContest(contestProblemNames);
   const problemList = problems.map((p) => ({

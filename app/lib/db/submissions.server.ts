@@ -1,38 +1,46 @@
 /**
  * Submissions Database Service
  *
- * Provides CRUD operations for submissions.
- * Switches between mock data and DynamoDB based on USE_DYNAMODB env var.
+ * Provides CRUD operations for submissions using DynamoDB.
  */
 
 import type { Submission, SubmissionVerdict } from "~/types/database";
 import { getSubmissionVerdict, formatDateTime } from "~/types/database";
-
-const USE_DYNAMODB = process.env.USE_DYNAMODB === "true";
-
-const dynamodb = USE_DYNAMODB
-  ? await import("./dynamodb/submissions.server")
-  : null;
-
 import {
-  mockSubmissions,
-  getSubmissionById,
-  createSubmission as mockCreateSubmission,
-  getSubmissionsForUser,
-  getProblemById,
-} from "../mock-data";
+  docClient,
+  TableNames,
+  GetCommand,
+  PutCommand,
+  UpdateCommand,
+  ScanCommand,
+  QueryCommand,
+} from "./dynamodb-client.server";
+import { incrementCounter } from "./counters.server";
+import { getProblem } from "./problems.server";
 
 // Re-export utility
 export { getSubmissionVerdict };
 
 /**
- * Get all submissions
+ * Get the next submission ID
+ */
+async function getNextSubmissionId(): Promise<number> {
+  return incrementCounter("submissionId");
+}
+
+/**
+ * Get all submissions (limited)
  */
 export async function listSubmissions(limit = 100): Promise<Submission[]> {
-  if (dynamodb) {
-    return dynamodb.listSubmissions(limit);
-  }
-  return mockSubmissions;
+  const result = await docClient.send(
+    new ScanCommand({
+      TableName: TableNames.submissions,
+      Limit: limit,
+    })
+  );
+
+  const items = (result.Items || []) as Submission[];
+  return items.sort((a, b) => b.subId - a.subId);
 }
 
 /**
@@ -41,47 +49,64 @@ export async function listSubmissions(limit = 100): Promise<Submission[]> {
 export async function listSubmissionsByTime(
   limit?: number
 ): Promise<Submission[]> {
-  if (dynamodb) {
-    return dynamodb.listSubmissions(limit || 100);
-  }
-  const sorted = [...mockSubmissions].sort((a, b) =>
-    b.submissionTime.localeCompare(a.submissionTime)
-  );
-  return limit ? sorted.slice(0, limit) : sorted;
+  return listSubmissions(limit || 100);
 }
 
 /**
  * Get a submission by ID
  */
 export async function getSubmission(subId: number): Promise<Submission | null> {
-  if (dynamodb) {
-    return dynamodb.getSubmission(subId);
-  }
-  return getSubmissionById(subId);
+  const result = await docClient.send(
+    new GetCommand({
+      TableName: TableNames.submissions,
+      Key: { subId },
+    })
+  );
+  return (result.Item as Submission) || null;
 }
 
 /**
  * Get submissions by username
  */
 export async function getSubmissionsByUser(
-  username: string
+  username: string,
+  limit = 100
 ): Promise<Submission[]> {
-  if (dynamodb) {
-    return dynamodb.listSubmissionsByUser(username);
-  }
-  return getSubmissionsForUser(username);
+  const result = await docClient.send(
+    new QueryCommand({
+      TableName: TableNames.submissions,
+      IndexName: "usernameIndex",
+      KeyConditionExpression: "username = :username",
+      ExpressionAttributeValues: {
+        ":username": username,
+      },
+      Limit: limit,
+      ScanIndexForward: false,
+    })
+  );
+  return (result.Items || []) as Submission[];
 }
 
 /**
  * Get submissions by problem
  */
 export async function getSubmissionsByProblem(
-  problemName: string
+  problemName: string,
+  limit = 100
 ): Promise<Submission[]> {
-  if (dynamodb) {
-    return dynamodb.listSubmissionsByProblem(problemName);
-  }
-  return mockSubmissions.filter((s) => s.problemName === problemName);
+  const result = await docClient.send(
+    new QueryCommand({
+      TableName: TableNames.submissions,
+      IndexName: "problemIndex",
+      KeyConditionExpression: "problemName = :problemName",
+      ExpressionAttributeValues: {
+        ":problemName": problemName,
+      },
+      Limit: limit,
+      ScanIndexForward: false,
+    })
+  );
+  return (result.Items || []) as Submission[];
 }
 
 /**
@@ -91,13 +116,8 @@ export async function getSubmissionsByUserAndProblem(
   username: string,
   problemName: string
 ): Promise<Submission[]> {
-  if (dynamodb) {
-    const subs = await dynamodb.listSubmissionsByUser(username);
-    return subs.filter((s) => s.problemName === problemName);
-  }
-  return mockSubmissions.filter(
-    (s) => s.username === username && s.problemName === problemName
-  );
+  const subs = await getSubmissionsByUser(username);
+  return subs.filter((s) => s.problemName === problemName);
 }
 
 /**
@@ -117,16 +137,44 @@ export async function createSubmission(
   language: string,
   testcaseCount?: number
 ): Promise<Submission> {
-  if (dynamodb) {
-    const problem = getProblemById(problemName);
-    const count = testcaseCount || problem?.testcaseCount || 10;
-    return dynamodb.createSubmission(username, problemName, language, count);
-  }
-  return mockCreateSubmission(username, problemName, language);
+  const subId = await getNextSubmissionId();
+  const now = formatDateTime(new Date());
+
+  const problem = await getProblem(problemName);
+  const count = testcaseCount || problem?.testcaseCount || 10;
+
+  const submission: Submission = {
+    subId,
+    username,
+    problemName,
+    language,
+    submissionTime: now,
+    gradingTime: now,
+    gradingCompleteTime: "",
+    score: Array(count).fill(0),
+    verdicts: Array(count).fill(":("),
+    times: Array(count).fill(0),
+    memories: Array(count).fill(0),
+    returnCodes: Array(count).fill(0),
+    status: Array(count).fill(1),
+    subtaskScores: problem?.subtaskScores.map(() => 0) || [0],
+    totalScore: 0,
+    maxTime: 0,
+    maxMemory: 0,
+  };
+
+  await docClient.send(
+    new PutCommand({
+      TableName: TableNames.submissions,
+      Item: submission,
+    })
+  );
+
+  return submission;
 }
 
 /**
- * Update a submission's grading results
+ * Update a submission's grading results for a single testcase
  */
 export async function updateSubmissionGrading(
   subId: number,
@@ -139,35 +187,33 @@ export async function updateSubmissionGrading(
     returnCode: number;
   }
 ): Promise<Submission | null> {
-  if (dynamodb) {
-    await dynamodb.updateSubmissionTestcase(subId, testcaseIndex, result);
-    return dynamodb.getSubmission(subId);
-  }
+  await docClient.send(
+    new UpdateCommand({
+      TableName: TableNames.submissions,
+      Key: { subId },
+      UpdateExpression: `
+        SET score[${testcaseIndex}] = :score,
+            verdicts[${testcaseIndex}] = :verdict,
+            times[${testcaseIndex}] = :time,
+            memories[${testcaseIndex}] = :memory,
+            returnCodes[${testcaseIndex}] = :returnCode,
+            #status[${testcaseIndex}] = :status
+      `,
+      ExpressionAttributeNames: {
+        "#status": "status",
+      },
+      ExpressionAttributeValues: {
+        ":score": result.score,
+        ":verdict": result.verdict,
+        ":time": result.time,
+        ":memory": result.memory,
+        ":returnCode": result.returnCode,
+        ":status": 2,
+      },
+    })
+  );
 
-  const submission = getSubmissionById(subId);
-  if (!submission) return null;
-
-  // Update testcase result
-  submission.score[testcaseIndex] = result.score;
-  submission.verdicts[testcaseIndex] = result.verdict;
-  submission.times[testcaseIndex] = result.time;
-  submission.memories[testcaseIndex] = result.memory;
-  submission.returnCodes[testcaseIndex] = result.returnCode;
-  submission.status[testcaseIndex] = 2; // completed
-
-  // Update max time/memory
-  submission.maxTime = Math.max(submission.maxTime, result.time);
-  submission.maxMemory = Math.max(submission.maxMemory, result.memory);
-
-  // Recalculate total score (sum of all testcase scores)
-  submission.totalScore = submission.score.reduce((sum, s) => sum + s, 0);
-
-  // Check if all testcases are graded
-  if (submission.status.every((s) => s === 2)) {
-    submission.gradingCompleteTime = formatDateTime(new Date());
-  }
-
-  return submission;
+  return getSubmission(subId);
 }
 
 /**
@@ -176,13 +222,17 @@ export async function updateSubmissionGrading(
 export async function markGradingStarted(
   subId: number
 ): Promise<Submission | null> {
-  const submission = await getSubmission(subId);
-  if (!submission) return null;
-
-  if (!dynamodb) {
-    submission.gradingTime = formatDateTime(new Date());
-  }
-  return submission;
+  await docClient.send(
+    new UpdateCommand({
+      TableName: TableNames.submissions,
+      Key: { subId },
+      UpdateExpression: "SET gradingTime = :gradingTime",
+      ExpressionAttributeValues: {
+        ":gradingTime": formatDateTime(new Date()),
+      },
+    })
+  );
+  return getSubmission(subId);
 }
 
 /**
@@ -192,19 +242,59 @@ export async function markCompileError(
   subId: number,
   message: string
 ): Promise<Submission | null> {
-  if (dynamodb) {
-    return dynamodb.setCompileError(subId, message);
-  }
-
-  const submission = getSubmissionById(subId);
+  const submission = await getSubmission(subId);
   if (!submission) return null;
 
-  submission.compileErrorMessage = message;
-  submission.gradingCompleteTime = formatDateTime(new Date());
-  submission.verdicts = submission.verdicts.map(() => "CE");
-  submission.status = submission.status.map(() => 2);
+  await docClient.send(
+    new UpdateCommand({
+      TableName: TableNames.submissions,
+      Key: { subId },
+      UpdateExpression: `
+        SET compileErrorMessage = :errorMessage,
+            gradingCompleteTime = :gradingCompleteTime
+      `,
+      ExpressionAttributeValues: {
+        ":errorMessage": message,
+        ":gradingCompleteTime": formatDateTime(new Date()),
+      },
+    })
+  );
 
-  return submission;
+  return getSubmission(subId);
+}
+
+/**
+ * Complete submission grading
+ */
+export async function completeSubmissionGrading(
+  subId: number,
+  subtaskScores: number[],
+  totalScore: number,
+  maxTime: number,
+  maxMemory: number
+): Promise<Submission | null> {
+  await docClient.send(
+    new UpdateCommand({
+      TableName: TableNames.submissions,
+      Key: { subId },
+      UpdateExpression: `
+        SET subtaskScores = :subtaskScores,
+            totalScore = :totalScore,
+            maxTime = :maxTime,
+            maxMemory = :maxMemory,
+            gradingCompleteTime = :gradingCompleteTime
+      `,
+      ExpressionAttributeValues: {
+        ":subtaskScores": subtaskScores,
+        ":totalScore": totalScore,
+        ":maxTime": maxTime,
+        ":maxMemory": maxMemory,
+        ":gradingCompleteTime": formatDateTime(new Date()),
+      },
+    })
+  );
+
+  return getSubmission(subId);
 }
 
 /**
@@ -219,7 +309,6 @@ export async function getBestSubmission(
 
   if (completed.length === 0) return null;
 
-  // Return the one with highest score (or earliest if tied)
   return completed.reduce((best, curr) =>
     curr.totalScore > best.totalScore
       ? curr
@@ -237,12 +326,20 @@ export async function countSubmissions(
   username: string,
   problemName: string
 ): Promise<number> {
-  if (dynamodb) {
-    return dynamodb.getSubmissionCount(username, problemName);
-  }
-  return mockSubmissions.filter(
-    (s) => s.username === username && s.problemName === problemName
-  ).length;
+  const result = await docClient.send(
+    new QueryCommand({
+      TableName: TableNames.submissions,
+      IndexName: "usernameIndex",
+      KeyConditionExpression: "username = :username",
+      FilterExpression: "problemName = :problemName",
+      ExpressionAttributeValues: {
+        ":username": username,
+        ":problemName": problemName,
+      },
+      Select: "COUNT",
+    })
+  );
+  return result.Count || 0;
 }
 
 /**
@@ -252,19 +349,23 @@ export async function getLatestSubmissionTime(
   username: string,
   problemName: string
 ): Promise<string | null> {
-  if (dynamodb) {
-    const latest = await dynamodb.getLatestSubmission(username, problemName);
-    return latest?.submissionTime || null;
-  }
-  const submissions = mockSubmissions.filter(
-    (s) => s.username === username && s.problemName === problemName
+  const result = await docClient.send(
+    new QueryCommand({
+      TableName: TableNames.submissions,
+      IndexName: "usernameIndex",
+      KeyConditionExpression: "username = :username",
+      FilterExpression: "problemName = :problemName",
+      ExpressionAttributeValues: {
+        ":username": username,
+        ":problemName": problemName,
+      },
+      Limit: 1,
+      ScanIndexForward: false,
+    })
   );
 
-  if (submissions.length === 0) return null;
-
-  return submissions.reduce((latest, curr) =>
-    curr.submissionTime > latest.submissionTime ? curr : latest
-  ).submissionTime;
+  const items = result.Items as Submission[] | undefined;
+  return items?.[0]?.submissionTime || null;
 }
 
 /**
@@ -297,8 +398,8 @@ export async function canUserSubmit(
 /**
  * Transform submission for display (with computed fields)
  */
-export function formatSubmissionForDisplay(submission: Submission) {
-  const problem = getProblemById(submission.problemName);
+export async function formatSubmissionForDisplay(submission: Submission) {
+  const problem = await getProblem(submission.problemName);
   const maxScore = problem
     ? problem.subtaskScores.reduce((sum, s) => sum + s, 0)
     : 100;

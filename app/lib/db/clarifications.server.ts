@@ -1,46 +1,47 @@
 /**
  * Clarifications Database Service
  *
- * Provides CRUD operations for clarifications (Q&A).
- * Switches between mock data and DynamoDB based on USE_DYNAMODB env var.
- *
- * Note: Clarifications use a composite key (askedBy + clarificationTime)
+ * Provides CRUD operations for clarifications (Q&A) using DynamoDB.
+ * Uses composite key: askedBy (PK) + clarificationTime (SK)
  */
 
 import type { Clarification } from "~/types/database";
 import { formatDateTime, getClarificationStatus } from "~/types/database";
-
-const USE_DYNAMODB = process.env.USE_DYNAMODB === "true";
-
-const dynamodb = USE_DYNAMODB
-  ? await import("./dynamodb/clarifications.server")
-  : null;
-
-import { mockClarifications } from "../mock-data";
+import {
+  docClient,
+  TableNames,
+  GetCommand,
+  PutCommand,
+  UpdateCommand,
+  DeleteCommand,
+  ScanCommand,
+  QueryCommand,
+} from "./dynamodb-client.server";
 
 // Re-export utility
 export { getClarificationStatus };
 
 /**
- * Get all clarifications
+ * Get all clarifications (sorted by time, newest first)
  */
 export async function listClarifications(): Promise<Clarification[]> {
-  if (dynamodb) {
-    return dynamodb.listClarifications();
-  }
-  return mockClarifications;
+  const result = await docClient.send(
+    new ScanCommand({
+      TableName: TableNames.clarifications,
+    })
+  );
+
+  const items = (result.Items || []) as Clarification[];
+  return items.sort((a, b) =>
+    b.clarificationTime.localeCompare(a.clarificationTime)
+  );
 }
 
 /**
  * Get clarifications ordered by time (newest first)
  */
 export async function listClarificationsByTime(): Promise<Clarification[]> {
-  if (dynamodb) {
-    return dynamodb.listClarifications(); // Already sorted
-  }
-  return [...mockClarifications].sort((a, b) =>
-    b.clarificationTime.localeCompare(a.clarificationTime)
-  );
+  return listClarifications();
 }
 
 /**
@@ -50,14 +51,13 @@ export async function getClarification(
   askedBy: string,
   clarificationTime: string
 ): Promise<Clarification | null> {
-  if (dynamodb) {
-    return dynamodb.getClarification(askedBy, clarificationTime);
-  }
-  return (
-    mockClarifications.find(
-      (c) => c.askedBy === askedBy && c.clarificationTime === clarificationTime
-    ) || null
+  const result = await docClient.send(
+    new GetCommand({
+      TableName: TableNames.clarifications,
+      Key: { askedBy, clarificationTime },
+    })
   );
+  return (result.Item as Clarification) || null;
 }
 
 /**
@@ -66,10 +66,17 @@ export async function getClarification(
 export async function getClarificationsByUser(
   username: string
 ): Promise<Clarification[]> {
-  if (dynamodb) {
-    return dynamodb.listClarificationsByUser(username);
-  }
-  return mockClarifications.filter((c) => c.askedBy === username);
+  const result = await docClient.send(
+    new QueryCommand({
+      TableName: TableNames.clarifications,
+      KeyConditionExpression: "askedBy = :askedBy",
+      ExpressionAttributeValues: {
+        ":askedBy": username,
+      },
+      ScanIndexForward: false,
+    })
+  );
+  return (result.Items || []) as Clarification[];
 }
 
 /**
@@ -86,10 +93,8 @@ export async function getClarificationsByProblem(
  * Get pending clarifications (unanswered)
  */
 export async function getPendingClarifications(): Promise<Clarification[]> {
-  if (dynamodb) {
-    return dynamodb.listPendingClarifications();
-  }
-  return mockClarifications.filter((c) => c.answer === "");
+  const all = await listClarifications();
+  return all.filter((c) => c.answer === "");
 }
 
 /**
@@ -108,11 +113,7 @@ export async function createClarification(
   question: string,
   problemName?: string
 ): Promise<Clarification> {
-  if (dynamodb) {
-    return dynamodb.createClarification(askedBy, question, problemName || "");
-  }
-
-  const newClarification: Clarification = {
+  const clarification: Clarification = {
     askedBy,
     clarificationTime: formatDateTime(new Date()),
     problemName: problemName || "",
@@ -121,8 +122,14 @@ export async function createClarification(
     answeredBy: "",
   };
 
-  mockClarifications.push(newClarification);
-  return newClarification;
+  await docClient.send(
+    new PutCommand({
+      TableName: TableNames.clarifications,
+      Item: clarification,
+    })
+  );
+
+  return clarification;
 }
 
 /**
@@ -134,17 +141,19 @@ export async function answerClarification(
   answer: string,
   answeredBy: string
 ): Promise<Clarification | null> {
-  if (dynamodb) {
-    return dynamodb.answerClarification(askedBy, clarificationTime, answer, answeredBy);
-  }
-
-  const clarification = await getClarification(askedBy, clarificationTime);
-  if (!clarification) return null;
-
-  clarification.answer = answer;
-  clarification.answeredBy = answeredBy;
-
-  return clarification;
+  const result = await docClient.send(
+    new UpdateCommand({
+      TableName: TableNames.clarifications,
+      Key: { askedBy, clarificationTime },
+      UpdateExpression: "SET answer = :answer, answeredBy = :answeredBy",
+      ExpressionAttributeValues: {
+        ":answer": answer,
+        ":answeredBy": answeredBy,
+      },
+      ReturnValues: "ALL_NEW",
+    })
+  );
+  return (result.Attributes as Clarification) || null;
 }
 
 /**
@@ -158,9 +167,18 @@ export async function updateClarificationQuestion(
   const clarification = await getClarification(askedBy, clarificationTime);
   if (!clarification || clarification.answer !== "") return null;
 
-  // In DynamoDB mode, we'd need to update; for now mock only
-  clarification.question = newQuestion;
-  return clarification;
+  const result = await docClient.send(
+    new UpdateCommand({
+      TableName: TableNames.clarifications,
+      Key: { askedBy, clarificationTime },
+      UpdateExpression: "SET question = :question",
+      ExpressionAttributeValues: {
+        ":question": newQuestion,
+      },
+      ReturnValues: "ALL_NEW",
+    })
+  );
+  return (result.Attributes as Clarification) || null;
 }
 
 /**
@@ -170,16 +188,12 @@ export async function deleteClarification(
   askedBy: string,
   clarificationTime: string
 ): Promise<boolean> {
-  if (dynamodb) {
-    return dynamodb.deleteClarification(askedBy, clarificationTime);
-  }
-
-  const index = mockClarifications.findIndex(
-    (c) => c.askedBy === askedBy && c.clarificationTime === clarificationTime
+  await docClient.send(
+    new DeleteCommand({
+      TableName: TableNames.clarifications,
+      Key: { askedBy, clarificationTime },
+    })
   );
-  if (index === -1) return false;
-
-  mockClarifications.splice(index, 1);
   return true;
 }
 

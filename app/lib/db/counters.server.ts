@@ -1,7 +1,7 @@
 /**
- * DynamoDB Global Counters Service
+ * Global Counters Database Service
  *
- * Atomic counter operations for ID generation.
+ * Atomic counter operations for ID generation using DynamoDB.
  */
 
 import {
@@ -9,7 +9,7 @@ import {
   TableNames,
   UpdateCommand,
   GetCommand,
-} from "../dynamodb-client.server";
+} from "./dynamodb-client.server";
 
 /**
  * Get the current value of a counter
@@ -21,7 +21,6 @@ export async function getCounter(counterId: string): Promise<number> {
       Key: { counterId },
     })
   );
-
   return (result.Item?.value as number) || 0;
 }
 
@@ -48,20 +47,5 @@ export async function incrementCounter(
       ReturnValues: "UPDATED_NEW",
     })
   );
-
   return result.Attributes?.value as number;
-}
-
-/**
- * Get the next submission ID
- */
-export async function getNextSubmissionId(): Promise<number> {
-  return incrementCounter("submissionId");
-}
-
-/**
- * Get the next announcement ID
- */
-export async function getNextAnnouncementId(): Promise<number> {
-  return incrementCounter("announcementId");
 }

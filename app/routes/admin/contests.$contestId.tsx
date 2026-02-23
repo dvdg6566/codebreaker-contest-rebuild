@@ -67,18 +67,18 @@ import { cn } from "~/lib/utils";
 import type { Contest, ContestMode } from "~/types/database";
 import { parseDateTime, formatDateTime, isDateTimeNotSet } from "~/types/database";
 import {
-  getContestById,
+  getContest,
   updateContest,
   getContestStatus,
-  mockProblems,
-  mockUsers,
-} from "~/lib/mock-data";
+  listProblems,
+  listUsers,
+} from "~/lib/db/index.server";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { requireAdmin } = await import("~/lib/auth.server");
   await requireAdmin(request);
 
-  const contest = getContestById(params.contestId);
+  const contest = await getContest(params.contestId);
   if (!contest) {
     throw new Response("Contest not found", { status: 404 });
   }
@@ -86,14 +86,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const status = getContestStatus(contest);
 
   // Get all available problems
-  const allProblems = mockProblems.map((p) => ({
+  const problems = await listProblems();
+  const allProblems = problems.map((p) => ({
     problemName: p.problemName,
     title: p.title,
     difficulty: p.difficulty,
   }));
 
   // Get all users for adding to contest
-  const allUsers = mockUsers.map((u) => ({
+  const users = await listUsers();
+  const allUsers = users.map((u) => ({
     username: u.username,
     role: u.role,
   }));
@@ -114,7 +116,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const intent = formData.get("intent") as string;
   const contestId = params.contestId;
 
-  const contest = getContestById(contestId);
+  const contest = await getContest(contestId);
   if (!contest) {
     return { error: "Contest not found" };
   }
@@ -143,7 +145,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       updates.endTime = endTime ? formatDateTime(new Date(endTime)) : "9999-12-31 23:59:59";
     }
 
-    updateContest(contestId, updates);
+    await updateContest(contestId, updates);
     return { success: true, message: "Contest details updated" };
   }
 
@@ -162,7 +164,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { error: "Submission limit must be -1 (unlimited) or a positive number" };
     }
 
-    updateContest(contestId, {
+    await updateContest(contestId, {
       subLimit,
       subDelay,
       public: isPublic,
@@ -180,7 +182,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (contest.problems.includes(problemName)) {
       return { error: "Problem already in contest" };
     }
-    updateContest(contestId, {
+    await updateContest(contestId, {
       problems: [...contest.problems, problemName],
     });
     return { success: true, message: "Problem added" };
@@ -188,7 +190,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (intent === "remove_problem") {
     const problemName = formData.get("problemId") as string;
-    updateContest(contestId, {
+    await updateContest(contestId, {
       problems: contest.problems.filter((p) => p !== problemName),
     });
     return { success: true, message: "Problem removed" };
@@ -202,11 +204,12 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (contest.users?.[username]) {
       return { error: "User already in contest" };
     }
-    const userExists = mockUsers.some((u) => u.username === username);
-    if (!userExists) {
+    const { getUser } = await import("~/lib/db/index.server");
+    const user = await getUser(username);
+    if (!user) {
       return { error: "User not found" };
     }
-    updateContest(contestId, {
+    await updateContest(contestId, {
       users: { ...contest.users, [username]: "0" },
     });
     return { success: true, message: "User added" };
@@ -218,7 +221,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     delete newUsers[username];
     const newScores = { ...contest.scores };
     delete newScores[username];
-    updateContest(contestId, {
+    await updateContest(contestId, {
       users: newUsers,
       scores: newScores,
     });
@@ -229,7 +232,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const username = formData.get("username") as string;
     // In a real app, this would mark the user as frozen
     // For now, we just mark them as completed
-    updateContest(contestId, {
+    await updateContest(contestId, {
       users: { ...contest.users, [username]: "1" },
     });
     return { success: true, message: "User score frozen" };
