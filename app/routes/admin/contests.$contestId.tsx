@@ -258,6 +258,7 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
   const { contest, status, allProblems, allUsers } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+  const [selectedMode, setSelectedMode] = useState<ContestMode>(contest.mode || "centralized");
 
   // Get problem details for the contest
   const contestProblems = contest.problems.map((problemName) => {
@@ -411,9 +412,23 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
 
                   <div className="space-y-2">
                     <Label htmlFor="mode">Contest Mode</Label>
-                    <Select name="mode" defaultValue={contest.mode}>
+                    <Select name="mode" value={selectedMode} onValueChange={(value) => setSelectedMode(value as ContestMode)}>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue>
+                          <span className="flex items-center">
+                            {selectedMode === "centralized" ? (
+                              <>
+                                <Clock className="mr-2 h-4 w-4" />
+                                Centralized Timer
+                              </>
+                            ) : (
+                              <>
+                                <Timer className="mr-2 h-4 w-4" />
+                                Self-Timer (Individual)
+                              </>
+                            )}
+                          </span>
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="centralized">
@@ -431,7 +446,7 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
                       </SelectContent>
                     </Select>
                     <p className="text-sm text-muted-foreground">
-                      {contest.mode === "centralized"
+                      {selectedMode === "centralized"
                         ? "All participants share the same start/end time."
                         : "Each participant has their own timer starting when they begin."}
                     </p>
