@@ -1,3 +1,51 @@
-import { type RouteConfig, index } from "@react-router/dev/routes";
+import {
+  type RouteConfig,
+  index,
+  layout,
+  route,
+  prefix,
+} from "@react-router/dev/routes";
 
-export default [index("routes/home.tsx")] satisfies RouteConfig;
+export default [
+  // Login page (outside main layout)
+  route("login", "routes/login.tsx"),
+
+  // API routes (outside main layout)
+  ...prefix("api", [
+    ...prefix("auth", [
+      route("login", "routes/api/auth.login.ts"),
+      route("logout", "routes/api/auth.logout.ts"),
+      route("me", "routes/api/auth.me.ts"),
+    ]),
+    ...prefix("admin", [
+      route("users", "routes/api/admin/users.ts"),
+      route("users/:username", "routes/api/admin/users.$username.ts"),
+    ]),
+  ]),
+
+  layout("routes/layout.tsx", [
+    index("routes/home.tsx"),
+
+    // Contest routes
+    route("problems", "routes/problems.tsx"),
+    route("problems/:problemId", "routes/problems.$problemId.tsx"),
+    route("submissions", "routes/submissions.tsx"),
+    route("submissions/:subId", "routes/submissions.$subId.tsx"),
+    route("scoreboard", "routes/scoreboard.tsx"),
+    route("announcements", "routes/announcements.tsx"),
+    route("clarifications", "routes/clarifications.tsx"),
+    route("profile/:username", "routes/profile.$username.tsx"),
+
+    // Admin routes
+    ...prefix("admin", [
+      index("routes/admin/index.tsx"),
+      route("users", "routes/admin/users.tsx"),
+      route("contests", "routes/admin/contests.tsx"),
+      route("contests/:contestId", "routes/admin/contests.$contestId.tsx"),
+      route("problems", "routes/admin/problems.tsx"),
+      route("problems/:problemId", "routes/admin/problems.$problemId.tsx"),
+      route("clarifications", "routes/admin/clarifications.tsx"),
+      route("announcements", "routes/admin/announcements.tsx"),
+    ]),
+  ]),
+] satisfies RouteConfig;

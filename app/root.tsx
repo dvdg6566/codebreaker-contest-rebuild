@@ -9,6 +9,24 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { AuthProvider, type User } from "~/context/auth-context";
+
+export async function loader({ request }: Route.LoaderArgs) {
+  const { getCurrentUser } = await import("~/lib/auth.server");
+  const session = await getCurrentUser(request);
+
+  if (!session) {
+    return { user: null };
+  }
+
+  const user: User = {
+    userId: session.userId,
+    username: session.username,
+    role: session.role,
+  };
+
+  return { user };
+}
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -41,8 +59,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App() {
-  return <Outlet />;
+export default function App({ loaderData }: Route.ComponentProps) {
+  const { user } = loaderData;
+
+  return (
+    <AuthProvider user={user}>
+      <Outlet />
+    </AuthProvider>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
