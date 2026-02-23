@@ -83,10 +83,6 @@ export interface Contest {
   // Extended fields (not in reference DynamoDB, but useful for enhanced features)
   /** Contest description/rules */
   description?: string;
-  /** Editorial content or URL */
-  editorial?: string;
-  /** Whether editorial is visible to participants */
-  editorialVisible?: boolean;
   /** Duration in minutes for self-timer mode */
   duration?: number;
   /** Contest timing mode */
@@ -112,8 +108,6 @@ export const DEFAULT_CONTEST: Omit<Contest, "contestId"> = {
   subLimit: 50,
   subDelay: 60,
   description: "",
-  editorial: "",
-  editorialVisible: false,
   duration: 180,
   mode: "centralized",
   users: {},
@@ -157,8 +151,6 @@ export interface Problem {
   fullFeedback: boolean;
   /** Whether problem is ready for submissions */
   validated: boolean;
-  /** Editorial content: { "en": "...", "zh": "..." } */
-  editorials?: Record<string, string>;
 
   // Extended fields (not in reference DynamoDB)
   /** Problem source/origin */

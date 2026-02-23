@@ -124,7 +124,6 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "update_details") {
     const name = formData.get("name") as string;
     const description = formData.get("description") as string;
-    const editorial = formData.get("editorial") as string;
     const mode = formData.get("mode") as ContestMode;
     const duration = parseInt(formData.get("duration") as string) || 0;
     const startTime = formData.get("startTime") as string;
@@ -133,7 +132,6 @@ export async function action({ request, params }: Route.ActionArgs) {
     const updates: Partial<Contest> = {
       contestName: name || contest.contestName,
       description: description || "",
-      editorial: editorial || "",
       mode: mode || contest.mode,
       duration,
     };
@@ -154,7 +152,6 @@ export async function action({ request, params }: Route.ActionArgs) {
     const subDelay = parseInt(formData.get("subDelay") as string);
     const isPublic = formData.get("public") === "on";
     const publicScoreboard = formData.get("publicScoreboard") === "on";
-    const editorialVisible = formData.get("editorialVisible") === "on";
 
     if (subDelay < 5) {
       return { error: "Submission delay must be at least 5 seconds" };
@@ -169,7 +166,6 @@ export async function action({ request, params }: Route.ActionArgs) {
       subDelay,
       public: isPublic,
       publicScoreboard,
-      editorialVisible,
     });
     return { success: true, message: "Settings updated" };
   }
@@ -400,17 +396,6 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="editorial">Editorial URL</Label>
-                    <Input
-                      id="editorial"
-                      name="editorial"
-                      type="url"
-                      defaultValue={contest.editorial}
-                      placeholder="https://example.com/editorial"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
                     <Label htmlFor="mode">Contest Mode</Label>
                     <Select name="mode" value={selectedMode} onValueChange={(value) => setSelectedMode(value as ContestMode)}>
                       <SelectTrigger>
@@ -573,19 +558,6 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
                       <Switch
                         name="publicScoreboard"
                         defaultChecked={contest.publicScoreboard}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Show Editorial</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Editorial visible to participants
-                        </p>
-                      </div>
-                      <Switch
-                        name="editorialVisible"
-                        defaultChecked={contest.editorialVisible}
                       />
                     </div>
                   </div>

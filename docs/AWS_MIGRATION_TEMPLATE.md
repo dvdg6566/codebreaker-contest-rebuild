@@ -154,7 +154,6 @@ export async function getContestScoreboard(contestId: string): Promise<Scoreboar
 | `updateSubtaskInfo(problemName, info)` | Update subtasks | `problems.server.ts` | 🔲 TODO |
 | `uploadChecker(checker, s3Name)` | Upload checker | `problems.server.ts` | 🔲 TODO (S3) |
 | `compileChecker(problemName)` | Invoke Lambda | `problems.server.ts` | 🔲 TODO (Lambda) |
-| `updateEditorialInfo(problemName, info)` | Update editorial | `problems.server.ts` | 🔲 TODO |
 | `uploadGrader(sourceName, target)` | Upload grader | `problems.server.ts` | 🔲 TODO (S3) |
 | `getTestcase(path)` | Download testcase | `problems.server.ts` | 🔲 TODO (S3) |
 | `getAttachment(path)` | Download attachment | `problems.server.ts` | 🔲 TODO (S3) |
