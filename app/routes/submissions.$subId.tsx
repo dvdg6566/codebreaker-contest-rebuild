@@ -1,5 +1,5 @@
 import type { Route } from "./+types/submissions.$subId";
-import { Link, useParams } from "react-router";
+import { Link } from "react-router";
 import {
   ChevronLeft,
   Clock,
@@ -32,6 +32,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 
 export function meta({ params }: Route.MetaArgs) {
   return [
@@ -40,114 +41,135 @@ export function meta({ params }: Route.MetaArgs) {
   ];
 }
 
-// Mock submission data
-const submissionData = {
-  id: 1245,
-  username: "alice_chen",
-  displayName: "Alice Chen",
-  problem: "Graph Traversal",
-  problemId: "graph-traversal",
-  language: "C++ 17",
-  verdict: "PS",
-  totalScore: 75,
-  maxScore: 100,
-  maxTime: "0.08",
-  maxMemory: 14.2,
-  submissionTime: "2024-02-23 14:32:15 (GMT+8)",
-  gradingCompleteTime: "2024-02-23 14:32:18 (GMT+8)",
-  compileError: null,
-  code: `#include <bits/stdc++.h>
-using namespace std;
+export async function loader({ request, params }: Route.LoaderArgs) {
+  const { requireAuth } = await import("~/lib/auth.server");
+  const { getSubmission, getSubmissionVerdict } = await import("~/lib/db/submissions.server");
+  const { getProblem } = await import("~/lib/db/problems.server");
+  const { getUser } = await import("~/lib/db/users.server");
+  const { getSubmissionSource, getCommunicationSource } = await import("~/lib/s3.server");
 
-const int INF = 1e9;
+  await requireAuth(request);
 
-int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
+  const subId = parseInt(params.subId, 10);
+  if (isNaN(subId)) {
+    throw new Response("Invalid submission ID", { status: 400 });
+  }
 
-    int n, m;
-    cin >> n >> m;
+  const submission = await getSubmission(subId);
+  if (!submission) {
+    throw new Response("Submission not found", { status: 404 });
+  }
 
-    vector<vector<pair<int, int>>> adj(n + 1);
-    for (int i = 0; i < m; i++) {
-        int u, v, w;
-        cin >> u >> v >> w;
-        adj[u].push_back({v, w});
-    }
+  const [problem, user] = await Promise.all([
+    getProblem(submission.problemName),
+    getUser(submission.username),
+  ]);
 
-    vector<int> dist(n + 1, INF);
-    priority_queue<pair<int, int>, vector<pair<int, int>>, greater<>> pq;
+  // Get source code from S3
+  let code: string | null = null;
+  let codeA: string | null = null;
+  let codeB: string | null = null;
 
-    dist[1] = 0;
-    pq.push({0, 1});
+  if (problem?.problem_type === "Communication") {
+    const commSource = await getCommunicationSource(subId, submission.language);
+    codeA = commSource.codeA;
+    codeB = commSource.codeB;
+  } else {
+    code = await getSubmissionSource(subId, submission.language);
+  }
 
-    while (!pq.empty()) {
-        auto [d, u] = pq.top();
-        pq.pop();
+  // Build subtasks from submission data
+  const subtaskScores = problem?.subtaskScores || [100];
+  const subtaskDeps = problem?.subtaskDependency || ["1-" + (submission.verdicts?.length || 1)];
 
-        if (d > dist[u]) continue;
+  // Parse dependencies to build subtask-to-testcase mapping
+  const subtasks = subtaskScores.map((maxScore, index) => {
+    const depString = subtaskDeps[index] || "";
+    const testcaseIds: number[] = [];
 
-        for (auto [v, w] : adj[u]) {
-            if (dist[u] + w < dist[v]) {
-                dist[v] = dist[u] + w;
-                pq.push({dist[v], v});
-            }
+    // Parse dependency string like "1-5" or "1,2,3" or "1-3,5"
+    const parts = depString.split(",");
+    for (const part of parts) {
+      if (part.includes("-")) {
+        const [start, end] = part.split("-").map((n) => parseInt(n.trim(), 10));
+        for (let i = start; i <= end; i++) {
+          testcaseIds.push(i);
         }
+      } else {
+        const num = parseInt(part.trim(), 10);
+        if (!isNaN(num)) testcaseIds.push(num);
+      }
     }
 
-    cout << (dist[n] == INF ? -1 : dist[n]) << endl;
+    // Build testcases for this subtask
+    const testcases = testcaseIds.map((tcId) => {
+      const tcIndex = tcId - 1; // 0-indexed
+      const status = submission.status?.[tcIndex] ?? 1;
+      const isGraded = status === 2;
 
-    return 0;
-}`,
-  subtasks: [
-    {
-      id: 1,
-      maxScore: 20,
-      yourScore: 20,
-      verdict: "AC",
-      testcases: [
-        { id: 1, verdict: "AC", score: 100, time: 0.01, memory: 8.2 },
-        { id: 2, verdict: "AC", score: 100, time: 0.01, memory: 8.4 },
-        { id: 3, verdict: "AC", score: 100, time: 0.02, memory: 8.6 },
-      ],
+      return {
+        id: tcId,
+        verdict: isGraded ? submission.verdicts?.[tcIndex] || "N/A" : "...",
+        score: isGraded ? submission.score?.[tcIndex] ?? 0 : "-",
+        time: isGraded ? ((submission.times?.[tcIndex] ?? 0) / 1000).toFixed(2) : "N/A",
+        memory: isGraded ? ((submission.memories?.[tcIndex] ?? 0) / 1000).toFixed(1) : "N/A",
+      };
+    });
+
+    // Determine subtask verdict
+    const allAC = testcases.every((tc) => tc.verdict === "AC");
+    const hasNonAC = testcases.some((tc) => tc.verdict !== "AC" && tc.verdict !== "..." && tc.verdict !== "N/A");
+    const subtaskVerdict = allAC ? "AC" : hasNonAC ? testcases.find((tc) => tc.verdict !== "AC" && tc.verdict !== "..." && tc.verdict !== "N/A")?.verdict || "N/A" : "...";
+
+    return {
+      id: index + 1,
+      maxScore,
+      yourScore: submission.subtaskScores?.[index] || 0,
+      verdict: subtaskVerdict,
+      testcases,
+    };
+  });
+
+  // Calculate max score
+  const maxScore = subtaskScores.reduce((sum, s) => sum + s, 0);
+
+  // Get display language
+  const languageDisplay =
+    submission.language === "cpp"
+      ? "C++ 17"
+      : submission.language === "py"
+      ? "Python 3"
+      : submission.language === "java"
+      ? "Java"
+      : submission.language;
+
+  return {
+    submissionData: {
+      id: submission.subId,
+      username: submission.username,
+      displayName: user?.fullname || submission.username,
+      problem: problem?.title || submission.problemName,
+      problemId: submission.problemName,
+      problemType: problem?.problem_type || "Batch",
+      nameA: problem?.nameA,
+      nameB: problem?.nameB,
+      language: languageDisplay,
+      verdict: getSubmissionVerdict(submission),
+      totalScore: submission.totalScore,
+      maxScore,
+      maxTime: submission.maxTime > 0 ? (submission.maxTime / 1000).toFixed(2) : "N/A",
+      maxMemory: submission.maxMemory > 0 ? (submission.maxMemory / 1000).toFixed(1) : "N/A",
+      submissionTime: submission.submissionTime,
+      gradingCompleteTime: submission.gradingCompleteTime || "Grading...",
+      compileError: submission.compileErrorMessage || null,
+      code,
+      codeA,
+      codeB,
+      subtasks,
+      isGrading: submission.status?.some((s) => s === 1) ?? true,
     },
-    {
-      id: 2,
-      maxScore: 30,
-      yourScore: 30,
-      verdict: "AC",
-      testcases: [
-        { id: 4, verdict: "AC", score: 100, time: 0.03, memory: 9.2 },
-        { id: 5, verdict: "AC", score: 100, time: 0.04, memory: 10.1 },
-        { id: 6, verdict: "AC", score: 100, time: 0.05, memory: 11.4 },
-        { id: 7, verdict: "AC", score: 100, time: 0.05, memory: 11.8 },
-      ],
-    },
-    {
-      id: 3,
-      maxScore: 25,
-      yourScore: 25,
-      verdict: "AC",
-      testcases: [
-        { id: 8, verdict: "AC", score: 100, time: 0.06, memory: 12.4 },
-        { id: 9, verdict: "AC", score: 100, time: 0.07, memory: 13.2 },
-        { id: 10, verdict: "AC", score: 100, time: 0.08, memory: 14.2 },
-      ],
-    },
-    {
-      id: 4,
-      maxScore: 25,
-      yourScore: 0,
-      verdict: "WA",
-      testcases: [
-        { id: 11, verdict: "WA", score: 0, time: 0.05, memory: 12.8 },
-        { id: 12, verdict: "WA", score: 0, time: 0.06, memory: 13.4 },
-        { id: 13, verdict: "N/A", score: "-", time: "N/A", memory: "N/A" },
-        { id: 14, verdict: "N/A", score: "-", time: "N/A", memory: "N/A" },
-      ],
-    },
-  ],
-};
+  };
+}
 
 const verdictIcon = (verdict: string) => {
   switch (verdict) {
@@ -168,8 +190,8 @@ const verdictIcon = (verdict: string) => {
   }
 };
 
-export default function SubmissionDetail() {
-  const params = useParams();
+export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
+  const { submissionData } = loaderData;
 
   return (
     <div className="space-y-6">
@@ -304,9 +326,32 @@ export default function SubmissionDetail() {
               </div>
             </CardHeader>
             <CardContent>
-              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
-                <code className="font-mono">{submissionData.code}</code>
-              </pre>
+              {submissionData.problemType === "Communication" ? (
+                <Tabs defaultValue="codeA">
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="codeA">
+                      {submissionData.nameA || "File A"}
+                    </TabsTrigger>
+                    <TabsTrigger value="codeB">
+                      {submissionData.nameB || "File B"}
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="codeA">
+                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+                      <code className="font-mono">{submissionData.codeA || "Source code not available"}</code>
+                    </pre>
+                  </TabsContent>
+                  <TabsContent value="codeB">
+                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+                      <code className="font-mono">{submissionData.codeB || "Source code not available"}</code>
+                    </pre>
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+                  <code className="font-mono">{submissionData.code || "Source code not available"}</code>
+                </pre>
+              )}
             </CardContent>
           </Card>
 

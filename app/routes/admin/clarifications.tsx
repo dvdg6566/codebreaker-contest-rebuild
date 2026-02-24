@@ -1,6 +1,6 @@
 import type { Route } from "./+types/clarifications";
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, data, useSubmit } from "react-router";
 import {
   MessageSquare,
   Clock,
@@ -42,6 +42,12 @@ import {
 } from "~/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ClientOnly } from "~/components/ui/client-only";
+import {
+  listClarifications,
+  answerClarification,
+} from "~/lib/db/clarifications.server";
+import { getUser } from "~/lib/db/users.server";
+import { getProblem } from "~/lib/db/problems.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -50,81 +56,54 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-// Mock clarifications data - all clarifications from all users
-const clarifications = [
-  {
-    id: 3,
-    username: "alice_chen",
-    displayName: "Alice Chen",
-    problem: "Segment Tree",
-    problemId: "segment-tree",
-    question: "Can the range queries overlap?",
-    answer: null,
-    answeredBy: null,
-    status: "pending",
-    time: "2024-02-23 12:15:00",
-  },
-  {
-    id: 6,
-    username: "bob_smith",
-    displayName: "Bob Smith",
-    problem: "Dynamic Array",
-    problemId: "dynamic-array",
-    question: "What happens if the array is empty?",
-    answer: null,
-    answeredBy: null,
-    status: "pending",
-    time: "2024-02-23 12:10:00",
-  },
-  {
-    id: 1,
-    username: "alice_chen",
-    displayName: "Alice Chen",
-    problem: "Graph Traversal",
-    problemId: "graph-traversal",
-    question: "Can there be multiple edges between the same pair of nodes?",
-    answer: "Yes",
-    answeredBy: "admin",
-    status: "answered",
-    time: "2024-02-23 11:45:00",
-  },
-  {
-    id: 2,
-    username: "bob_smith",
-    displayName: "Bob Smith",
-    problem: "Dynamic Array",
-    problemId: "dynamic-array",
-    question: "Is it guaranteed that all elements are distinct?",
-    answer: "Answered in task description",
-    answeredBy: "admin",
-    status: "answered",
-    time: "2024-02-23 11:30:00",
-  },
-  {
-    id: 4,
-    username: "carol_davis",
-    displayName: "Carol Davis",
-    problem: null,
-    problemId: null,
-    question: "Is there a break during the contest?",
-    answer: "No comment",
-    answeredBy: "admin",
-    status: "answered",
-    time: "2024-02-23 10:00:00",
-  },
-  {
-    id: 5,
-    username: "alice_chen",
-    displayName: "Alice Chen",
-    problem: null,
-    problemId: null,
-    question: "What is the time limit for each problem?",
-    answer: "Answered in task description",
-    answeredBy: "admin",
-    status: "answered",
-    time: "2024-02-23 09:30:00",
-  },
-];
+export async function loader({}: Route.LoaderArgs) {
+  const dbClarifications = await listClarifications();
+
+  // Map database clarifications to display format
+  const clarifications = await Promise.all(
+    dbClarifications.map(async (c) => {
+      const user = await getUser(c.askedBy);
+      const problem = c.problemName ? await getProblem(c.problemName) : null;
+
+      return {
+        id: `${c.askedBy}:${c.clarificationTime}`,
+        username: c.askedBy,
+        displayName: user?.fullname || c.askedBy,
+        problem: problem?.title || null,
+        problemId: c.problemName || null,
+        question: c.question,
+        answer: c.answer || null,
+        answeredBy: c.answeredBy || null,
+        status: c.answer ? "answered" : "pending",
+        time: c.clarificationTime,
+      };
+    })
+  );
+
+  return { clarifications };
+}
+
+export async function action({ request }: Route.ActionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get("intent") as string;
+
+  if (intent === "answer") {
+    const id = formData.get("id") as string;
+    const answer = formData.get("answer") as string;
+
+    if (!id || !answer) {
+      return data({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    // Parse the composite ID
+    const [askedBy, clarificationTime] = id.split(":");
+
+    await answerClarification(askedBy, clarificationTime, answer, "admin");
+    return { success: true };
+  }
+
+  return data({ error: "Unknown action" }, { status: 400 });
+}
 
 // Possible answers for admins
 const clarificationAnswers = [
@@ -136,15 +115,29 @@ const clarificationAnswers = [
   "Invalid question",
 ];
 
-export default function AdminClarifications() {
-  const [answerDialogOpen, setAnswerDialogOpen] = useState<number | null>(null);
+export default function AdminClarifications({ loaderData }: Route.ComponentProps) {
+  const { clarifications } = loaderData;
+  const submit = useSubmit();
+  const [answerDialogOpen, setAnswerDialogOpen] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("pending");
+  const [selectedAnswer, setSelectedAnswer] = useState("");
 
   const pendingClarifications = clarifications.filter((c) => c.status === "pending");
   const answeredClarifications = clarifications.filter((c) => c.status === "answered");
 
   const displayedClarifications =
     activeTab === "pending" ? pendingClarifications : answeredClarifications;
+
+  const handleAnswer = () => {
+    if (!answerDialogOpen || !selectedAnswer) return;
+    const formData = new FormData();
+    formData.set("intent", "answer");
+    formData.set("id", answerDialogOpen);
+    formData.set("answer", selectedAnswer);
+    submit(formData, { method: "POST" });
+    setAnswerDialogOpen(null);
+    setSelectedAnswer("");
+  };
 
   return (
     <div className="space-y-6">
@@ -295,9 +288,10 @@ export default function AdminClarifications() {
                     {clarification.status === "pending" && (
                       <Dialog
                         open={answerDialogOpen === clarification.id}
-                        onOpenChange={(open) =>
-                          setAnswerDialogOpen(open ? clarification.id : null)
-                        }
+                        onOpenChange={(open) => {
+                          setAnswerDialogOpen(open ? clarification.id : null);
+                          if (!open) setSelectedAnswer("");
+                        }}
                       >
                         <DialogTrigger asChild>
                           <Button className="bg-emerald-600 hover:bg-emerald-700">
@@ -322,7 +316,10 @@ export default function AdminClarifications() {
                             </div>
                             <div className="space-y-2">
                               <Label>Select Answer</Label>
-                              <Select>
+                              <Select
+                                value={selectedAnswer}
+                                onValueChange={setSelectedAnswer}
+                              >
                                 <SelectTrigger>
                                   <SelectValue placeholder="Choose a response..." />
                                 </SelectTrigger>
@@ -345,7 +342,7 @@ export default function AdminClarifications() {
                             </Button>
                             <Button
                               className="bg-emerald-600 hover:bg-emerald-700"
-                              onClick={() => setAnswerDialogOpen(null)}
+                              onClick={handleAnswer}
                             >
                               Submit Answer
                             </Button>

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link, useParams } from "react-router";
+import { Link, useFetcher, useRevalidator } from "react-router";
 import type { Route } from "./+types/problems.$problemId";
 import {
   DndContext,
@@ -77,39 +77,126 @@ export function meta({ params }: Route.MetaArgs) {
   ];
 }
 
-// Sample problem data for demonstration
-const getSampleProblem = (problemId: string): Problem => ({
-  problemName: problemId,
-  title: problemId === "two_sum" ? "Two Sum" : "New Problem",
-  problem_type: "Batch",
-  validated: problemId === "two_sum",
-  timeLimit: 1,
-  memoryLimit: 256,
-  testcaseCount: 10,
-  fullFeedback: true,
-  customChecker: false,
-  attachments: false,
-  subtaskScores: [30, 70],
-  subtaskDependency: ["1-5", "1-10"],
-  verdicts: {
-    testdata: true,
-    statement: true,
-    scoring: true,
-    attachments: true,
-    checker: true,
-    grader: true,
-    subtasks: true,
-  },
-  remarks: {
-    testdata: "10 test cases found",
-    statement: "PDF statement uploaded",
-    scoring: "Total score: 100",
-    attachments: "No attachments required",
-    checker: "Default checker",
-    grader: "Not required for Batch",
-    subtasks: "2 subtasks configured",
-  },
-});
+export async function loader({ request, params }: Route.LoaderArgs) {
+  const { requireAdmin } = await import("~/lib/auth.server");
+  const { getProblem, validateProblemFiles } = await import("~/lib/db/problems.server");
+
+  await requireAdmin(request);
+
+  const problemName = params.problemId;
+  const problem = await getProblem(problemName);
+
+  if (!problem) {
+    throw new Response("Problem not found", { status: 404 });
+  }
+
+  // Get validation status (cached from DynamoDB, doesn't re-validate)
+  const validation = await validateProblemFiles(problemName);
+
+  return {
+    problem: {
+      ...problem,
+      verdicts: validation?.verdicts || problem.verdicts,
+      remarks: validation?.remarks || problem.remarks,
+    },
+  };
+}
+
+export async function action({ request, params }: Route.ActionArgs) {
+  const { requireAdmin } = await import("~/lib/auth.server");
+  const { getProblem, updateProblem, updateSubtasks, validateAndUpdateProblem } = await import("~/lib/db/problems.server");
+  const { regradeProblem, compileChecker } = await import("~/lib/grading.server");
+
+  await requireAdmin(request);
+
+  const problemName = params.problemId;
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  switch (intent) {
+    case "save": {
+      const title = formData.get("title") as string;
+      const problemType = formData.get("problem_type") as ProblemType;
+      const timeLimit = parseFloat(formData.get("timeLimit") as string) || 1;
+      const memoryLimit = parseInt(formData.get("memoryLimit") as string) || 256;
+      const fullFeedback = formData.get("fullFeedback") === "true";
+      const customChecker = formData.get("customChecker") === "true";
+      const attachments = formData.get("attachments") === "true";
+      const nameA = formData.get("nameA") as string || undefined;
+      const nameB = formData.get("nameB") as string || undefined;
+
+      await updateProblem(problemName, {
+        title,
+        problem_type: problemType,
+        timeLimit,
+        memoryLimit,
+        fullFeedback,
+        customChecker,
+        attachments,
+        nameA,
+        nameB,
+      });
+
+      return { success: true, message: "Problem saved successfully" };
+    }
+
+    case "updateSubtasks": {
+      const subtaskData = formData.get("subtasks") as string;
+      const subtasks = JSON.parse(subtaskData) as { score: number; dependency: string }[];
+
+      const subtaskScores = subtasks.map((st) => st.score);
+      const subtaskDependency = subtasks.map((st) => st.dependency);
+
+      // Also update testcaseCount based on the max testcase referenced in dependencies
+      let maxTestcase = 0;
+      for (const dep of subtaskDependency) {
+        const parts = dep.split(",");
+        for (const part of parts) {
+          if (part.includes("-")) {
+            const [, end] = part.split("-").map((n) => parseInt(n.trim(), 10));
+            maxTestcase = Math.max(maxTestcase, end);
+          } else {
+            const num = parseInt(part.trim(), 10);
+            if (!isNaN(num)) maxTestcase = Math.max(maxTestcase, num);
+          }
+        }
+      }
+
+      await updateSubtasks(problemName, subtaskScores, subtaskDependency);
+      if (maxTestcase > 0) {
+        await updateProblem(problemName, { testcaseCount: maxTestcase });
+      }
+
+      return { success: true, message: "Subtasks updated successfully" };
+    }
+
+    case "validate": {
+      const validation = await validateAndUpdateProblem(problemName);
+      return {
+        success: validation.validated,
+        message: validation.validated ? "Problem validated successfully" : "Validation failed - check the issues above",
+        validation,
+      };
+    }
+
+    case "regrade": {
+      const regradeType = formData.get("regradeType") as "NORMAL" | "AC" | "NONZERO";
+      const result = await regradeProblem(problemName, regradeType);
+      return { success: true, message: `Regrading ${result.count} submissions` };
+    }
+
+    case "compileChecker": {
+      const result = await compileChecker(problemName);
+      return {
+        success: result.success,
+        message: result.success ? "Checker compiled successfully" : result.error,
+      };
+    }
+
+    default:
+      return { success: false, message: "Unknown action" };
+  }
+}
 
 const problemOptions = [
   { value: "fullFeedback", label: "Full Feedback" },
@@ -117,19 +204,34 @@ const problemOptions = [
   { value: "attachments", label: "Attachments" },
 ];
 
-export default function EditProblemPage() {
-  const params = useParams();
-  const problemId = params.problemId as string;
+export default function EditProblemPage({ loaderData, actionData }: Route.ComponentProps) {
+  const { problem: initialProblem } = loaderData;
+  const fetcher = useFetcher();
+  const revalidator = useRevalidator();
 
-  // In a real app, this would fetch from API
-  const [problem, setProblem] = React.useState<Problem>(() => getSampleProblem(problemId));
+  // Local state for editing
+  const [problem, setProblem] = React.useState<Problem>(() => initialProblem);
   const [subtasks, setSubtasks] = React.useState<Subtask[]>(() =>
-    problem.subtaskScores.map((score, i) => ({
+    initialProblem.subtaskScores.map((score, i) => ({
       id: crypto.randomUUID(),
       score,
-      dependency: problem.subtaskDependency[i],
+      dependency: initialProblem.subtaskDependency?.[i] || "1",
     }))
   );
+
+  // Update local state when loader data changes
+  React.useEffect(() => {
+    setProblem(initialProblem);
+    setSubtasks(
+      initialProblem.subtaskScores.map((score, i) => ({
+        id: crypto.randomUUID(),
+        score,
+        dependency: initialProblem.subtaskDependency?.[i] || "1",
+      }))
+    );
+  }, [initialProblem]);
+
+  const isLoading = fetcher.state !== "idle";
 
   // DnD sensors for drag and drop
   const sensors = useSensors(
@@ -206,6 +308,48 @@ export default function EditProblemPage() {
 
   const totalScore = subtasks.reduce((sum, st) => sum + st.score, 0);
 
+  // Form submission handlers
+  const handleSave = () => {
+    const formData = new FormData();
+    formData.append("intent", "save");
+    formData.append("title", problem.title);
+    formData.append("problem_type", problem.problem_type);
+    formData.append("timeLimit", problem.timeLimit.toString());
+    formData.append("memoryLimit", problem.memoryLimit.toString());
+    formData.append("fullFeedback", problem.fullFeedback ? "true" : "false");
+    formData.append("customChecker", problem.customChecker ? "true" : "false");
+    formData.append("attachments", problem.attachments ? "true" : "false");
+    if (problem.nameA) formData.append("nameA", problem.nameA);
+    if (problem.nameB) formData.append("nameB", problem.nameB);
+    fetcher.submit(formData, { method: "post" });
+  };
+
+  const handleUpdateSubtasks = () => {
+    const formData = new FormData();
+    formData.append("intent", "updateSubtasks");
+    formData.append("subtasks", JSON.stringify(subtasks.map((st) => ({ score: st.score, dependency: st.dependency }))));
+    fetcher.submit(formData, { method: "post" });
+  };
+
+  const handleValidate = () => {
+    const formData = new FormData();
+    formData.append("intent", "validate");
+    fetcher.submit(formData, { method: "post" });
+  };
+
+  const handleRegrade = (regradeType: "NORMAL" | "AC" | "NONZERO") => {
+    const formData = new FormData();
+    formData.append("intent", "regrade");
+    formData.append("regradeType", regradeType);
+    fetcher.submit(formData, { method: "post" });
+  };
+
+  const handleCompileChecker = () => {
+    const formData = new FormData();
+    formData.append("intent", "compileChecker");
+    fetcher.submit(formData, { method: "post" });
+  };
+
   // Stats for the stats row
   const stats = [
     {
@@ -266,17 +410,24 @@ export default function EditProblemPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" asChild>
-            <Link to={`/problem/${problemId}`} target="_blank">
+            <Link to={`/problems/${problem.problemName}`} target="_blank">
               <ExternalLink className="mr-2 h-4 w-4" />
               View Problem
             </Link>
           </Button>
-          <Button>
+          <Button onClick={handleSave} disabled={isLoading}>
             <Save className="mr-2 h-4 w-4" />
             Save Changes
           </Button>
         </div>
       </div>
+
+      {/* Status message */}
+      {fetcher.data?.message && (
+        <div className={`p-3 rounded-lg text-sm ${fetcher.data.success ? "bg-emerald-50 border border-emerald-200 text-emerald-700" : "bg-red-50 border border-red-200 text-red-600"}`}>
+          {fetcher.data.message}
+        </div>
+      )}
 
       {/* Stats Row */}
       <div className="grid grid-cols-5 gap-4">
@@ -500,7 +651,7 @@ export default function EditProblemPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2">
               <Button variant="outline" asChild>
-                <Link to={`/admin/uploadtestdata/${problemId}`} target="_blank">
+                <Link to={`/admin/problems/${problem.problemName}/testdata`} target="_blank">
                   <Upload className="mr-2 h-4 w-4" />
                   Upload Testdata
                 </Link>
@@ -560,7 +711,7 @@ export default function EditProblemPage() {
               )}
             </div>
 
-            <Button variant="secondary">
+            <Button variant="secondary" onClick={handleUpdateSubtasks} disabled={isLoading}>
               <Save className="mr-2 h-4 w-4" />
               Update Subtasks
             </Button>
@@ -577,15 +728,15 @@ export default function EditProblemPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => handleRegrade("NORMAL")} disabled={isLoading}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 All Submissions
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => handleRegrade("NONZERO")} disabled={isLoading}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Non-zero
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => handleRegrade("AC")} disabled={isLoading}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 ACs Only
               </Button>
@@ -637,7 +788,7 @@ export default function EditProblemPage() {
               </TableBody>
             </Table>
 
-            <Button>
+            <Button onClick={handleValidate} disabled={isLoading}>
               <CheckCircle2 className="mr-2 h-4 w-4" />
               Validate Problem
             </Button>

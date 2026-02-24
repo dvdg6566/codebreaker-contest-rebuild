@@ -21,41 +21,26 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-// Mock announcements data
-const announcements = [
-  {
-    id: 1,
-    title: "Contest Extended by 30 Minutes",
-    text: "Due to technical difficulties at the start of the contest, we have extended the duration by 30 minutes. The new end time is 14:30.",
-    time: "2024-02-23 12:45:00",
-    type: "important",
-    author: "admin",
-  },
-  {
-    id: 2,
-    title: "Clarification on Problem C",
-    text: "The constraints have been updated for Problem C. Please note that N can be up to 100,000 instead of 10,000 as originally stated. All test cases have been regenerated.",
-    time: "2024-02-23 11:30:00",
-    type: "update",
-    author: "admin",
-  },
-  {
-    id: 3,
-    title: "Rejudging Complete for Problem B",
-    text: "All submissions for Problem B have been rejudged due to an issue with test case #7. Please check your submissions for updated scores.",
-    time: "2024-02-23 10:15:00",
-    type: "info",
-    author: "admin",
-  },
-  {
-    id: 4,
-    title: "Welcome to IOI Practice Round 2024",
-    text: "Welcome, participants! The contest has officially begun. You have 5 hours to solve 5 problems. Good luck!\n\nImportant reminders:\n- Read all problems carefully before starting\n- Check the constraints for each subtask\n- You have unlimited submissions\n- The scoreboard will be frozen in the last hour",
-    time: "2024-02-23 09:00:00",
-    type: "info",
-    author: "admin",
-  },
-];
+export async function loader({ request }: Route.LoaderArgs) {
+  const { requireAuth } = await import("~/lib/auth.server");
+  const { listAnnouncements } = await import("~/lib/db/announcements.server");
+
+  await requireAuth(request);
+
+  const dbAnnouncements = await listAnnouncements();
+
+  // Map DB fields to component format
+  const announcements = dbAnnouncements.map((a) => ({
+    id: a.announcementId,
+    title: a.title,
+    text: a.text,
+    time: a.announcementTime,
+    type: a.priority === "high" ? "important" : a.priority === "normal" ? "update" : "info",
+    author: a.author || "admin",
+  }));
+
+  return { announcements };
+}
 
 const typeConfig = {
   important: {
@@ -81,7 +66,9 @@ const typeConfig = {
   },
 };
 
-export default function Announcements() {
+export default function Announcements({ loaderData }: Route.ComponentProps) {
+  const { announcements } = loaderData;
+
   return (
     <div className="space-y-6">
       {/* Header */}

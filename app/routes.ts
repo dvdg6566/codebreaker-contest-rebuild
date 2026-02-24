@@ -20,7 +20,22 @@ export default [
     ...prefix("admin", [
       route("users", "routes/api/admin/users.ts"),
       route("users/:username", "routes/api/admin/users.$username.ts"),
+      route("upload", "routes/api/admin/upload.ts"),
+      route(
+        "problems/:problemId/testdata",
+        "routes/api/admin/problems.$problemId.testdata.ts"
+      ),
     ]),
+    // Problem statement API (authenticated)
+    route(
+      "problems/:problemId/statement",
+      "routes/api/problems.$problemId.statement.ts"
+    ),
+    // Submission source API (authenticated)
+    route(
+      "submissions/:subId/source",
+      "routes/api/submissions.$subId.source.ts"
+    ),
   ]),
 
   layout("routes/layout.tsx", [
@@ -44,6 +59,10 @@ export default [
       route("contests/:contestId", "routes/admin/contests.$contestId.tsx"),
       route("problems", "routes/admin/problems.tsx"),
       route("problems/:problemId", "routes/admin/problems.$problemId.tsx"),
+      route(
+        "problems/:problemId/testdata",
+        "routes/admin/problems.$problemId.testdata.tsx"
+      ),
       route("clarifications", "routes/admin/clarifications.tsx"),
       route("announcements", "routes/admin/announcements.tsx"),
     ]),

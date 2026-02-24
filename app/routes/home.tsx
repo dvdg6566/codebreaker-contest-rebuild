@@ -22,7 +22,7 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
 import { Input } from "~/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
@@ -160,7 +160,6 @@ export default function Home() {
             className="w-64 bg-muted/50"
           />
           <Avatar className="h-8 w-8">
-            <AvatarImage src="/avatars/user.jpg" />
             <AvatarFallback>JD</AvatarFallback>
           </Avatar>
         </div>

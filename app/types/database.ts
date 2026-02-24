@@ -89,8 +89,9 @@ export interface Contest {
   mode?: ContestMode;
   /** User assignments: { username: "0" (invited) | "1" (started) } */
   users?: Record<string, "0" | "1">;
-  /** Cached scores: { username: { problemName: score } } */
-  scores?: Record<string, Record<string, number>>;
+  /** Cached subtask scores: { username: { problemName: [subtask0Best, subtask1Best, ...] } }
+   *  IOI-style scoring: total score = sum of best score per subtask across all submissions */
+  scores?: Record<string, Record<string, number[]>>;
   /** Whether contest is publicly visible */
   public?: boolean;
   /** Whether scoreboard is publicly visible */
@@ -164,15 +165,16 @@ export interface Problem {
   nameA?: string;
   nameB?: string;
 
-  // Validation info (computed, may not be stored in DynamoDB)
+  // Validation info (stored in DynamoDB by problem-validation Lambda)
+  // Verdicts use 0/1 (not true/false) to match Lambda response
   verdicts?: {
-    testdata: boolean;
-    statement: boolean;
-    scoring: boolean;
-    attachments: boolean;
-    checker: boolean;
-    grader: boolean;
-    subtasks: boolean;
+    testdata: number;
+    statement: number;
+    scoring: number;
+    attachments: number;
+    checker: number;
+    grader: number;
+    subtasks: number;
   };
   remarks?: {
     testdata: string;
@@ -255,6 +257,11 @@ export type SubmissionVerdict = "AC" | "WA" | "TLE" | "MLE" | "RTE" | "CE" | "pe
  * Get overall verdict from submission data
  */
 export function getSubmissionVerdict(submission: Submission): SubmissionVerdict {
+  // Handle missing data gracefully
+  if (!submission.status || !submission.verdicts) {
+    return "pending";
+  }
+
   // Check if still grading
   if (submission.status.some(s => s === 1)) {
     return "pending";

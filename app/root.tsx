@@ -75,6 +75,25 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let stack: string | undefined;
 
   if (isRouteErrorResponse(error)) {
+    // Handle authentication errors - redirect to login
+    if (error.status === 401 || error.status === 302 || error.status === 303) {
+      // Use window.location for client-side redirect
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+        return null;
+      }
+      // Server-side: show a login link
+      return (
+        <main className="pt-16 p-4 container mx-auto text-center">
+          <h1 className="text-2xl font-bold mb-4">Please Log In</h1>
+          <p className="mb-4">You need to be logged in to access this page.</p>
+          <a href="/login" className="text-blue-600 hover:underline">
+            Go to Login
+          </a>
+        </main>
+      );
+    }
+
     message = error.status === 404 ? "404" : "Error";
     details =
       error.status === 404

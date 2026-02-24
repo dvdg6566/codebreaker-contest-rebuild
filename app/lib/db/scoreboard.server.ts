@@ -6,7 +6,7 @@
 
 import type { Contest, Problem, Submission, User } from "~/types/database";
 import { parseDateTime, getMaxScore } from "~/types/database";
-import { getContest } from "./contests.server";
+import { getContest, calculateProblemScore } from "./contests.server";
 import { listUsers, getUser } from "./users.server";
 import { getProblem } from "./problems.server";
 import { getSubmissionsByUser } from "./submissions.server";
@@ -55,7 +55,10 @@ export async function getScoreboard(contestId: string): Promise<ScoreboardEntry[
 
     const problems = contest.problems.map((problemName) => {
       const problem = problemsData.find((p) => p.problemName === problemName);
-      const score = userScores[problemName] || 0;
+      // userScores[problemName] is now an array of best subtask scores
+      const subtaskScores = userScores[problemName] || [];
+      // Calculate total score as sum of best subtask scores (IOI-style)
+      const score = calculateProblemScore(subtaskScores);
       const maxScore = problem ? getMaxScore(problem) : 100;
 
       const problemSubmissions = userSubmissions.filter(

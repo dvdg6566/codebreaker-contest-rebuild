@@ -174,6 +174,62 @@ export async function createSubmission(
 }
 
 /**
+ * Create a new submission with source code upload to S3
+ */
+export async function createSubmissionWithSource(
+  username: string,
+  problemName: string,
+  language: string,
+  sourceCode: string,
+  testcaseCount?: number
+): Promise<Submission> {
+  // Create the submission record first
+  const submission = await createSubmission(
+    username,
+    problemName,
+    language,
+    testcaseCount
+  );
+
+  // Upload source code to S3
+  const { uploadSubmissionSource } = await import("../s3.server");
+  await uploadSubmissionSource(submission.subId, sourceCode, language);
+
+  return submission;
+}
+
+/**
+ * Create a Communication problem submission with two source files
+ */
+export async function createCommunicationSubmission(
+  username: string,
+  problemName: string,
+  language: string,
+  sourceCodeA: string,
+  sourceCodeB: string,
+  testcaseCount?: number
+): Promise<Submission> {
+  // Create the submission record first
+  const submission = await createSubmission(
+    username,
+    problemName,
+    language,
+    testcaseCount
+  );
+
+  // Upload both source files to S3
+  const { uploadCommunicationSource } = await import("../s3.server");
+  await uploadCommunicationSource(
+    submission.subId,
+    sourceCodeA,
+    sourceCodeB,
+    language
+  );
+
+  return submission;
+}
+
+/**
  * Update a submission's grading results for a single testcase
  */
 export async function updateSubmissionGrading(
@@ -430,6 +486,45 @@ export async function formatSubmissionForDisplay(submission: Submission) {
         ? (submission.maxMemory / 1000).toFixed(1)
         : "N/A",
     submissionTime: submission.submissionTime,
-    isGrading: submission.status.some((s) => s === 1),
+    isGrading: submission.status?.some((s) => s === 1) ?? true,
   };
+}
+
+/**
+ * Update scores after grading completion
+ * Updates both contest scores (subtask-based) and user scores (total)
+ */
+export async function updateScoresAfterGrading(
+  submission: Submission
+): Promise<void> {
+  const { updateContestScore, calculateProblemScore } = await import(
+    "./contests.server"
+  );
+  const { updateUserScore } = await import("./users.server");
+  const { getUser } = await import("./users.server");
+
+  // Get user to find their contest
+  const user = await getUser(submission.username);
+  if (!user) return;
+
+  // Calculate total score from subtask scores
+  const totalScore = calculateProblemScore(submission.subtaskScores);
+
+  // Update user's problem score (stores total)
+  await updateUserScore(
+    submission.username,
+    submission.problemName,
+    totalScore,
+    submission.submissionTime
+  );
+
+  // Update contest scores (stores subtask bests for IOI-style scoring)
+  if (user.contest) {
+    await updateContestScore(
+      user.contest,
+      submission.username,
+      submission.problemName,
+      submission.subtaskScores
+    );
+  }
 }

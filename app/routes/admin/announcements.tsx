@@ -1,5 +1,6 @@
 import type { Route } from "./+types/announcements";
 import { useState } from "react";
+import { data, useSubmit } from "react-router";
 import {
   Megaphone,
   Plus,
@@ -56,6 +57,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import {
+  listAnnouncements,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+} from "~/lib/db/announcements.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -64,41 +71,70 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-// Mock announcements data
-const announcements = [
-  {
-    id: 1,
-    title: "Contest Extended by 30 Minutes",
-    text: "Due to technical difficulties at the start of the contest, we have extended the duration by 30 minutes. The new end time is 14:30.",
-    time: "2024-02-23 12:45:00",
-    type: "important",
-    author: "admin",
-  },
-  {
-    id: 2,
-    title: "Clarification on Problem C",
-    text: "The constraints have been updated for Problem C. Please note that N can be up to 100,000 instead of 10,000 as originally stated. All test cases have been regenerated.",
-    time: "2024-02-23 11:30:00",
-    type: "update",
-    author: "admin",
-  },
-  {
-    id: 3,
-    title: "Rejudging Complete for Problem B",
-    text: "All submissions for Problem B have been rejudged due to an issue with test case #7. Please check your submissions for updated scores.",
-    time: "2024-02-23 10:15:00",
-    type: "info",
-    author: "admin",
-  },
-  {
-    id: 4,
-    title: "Welcome to IOI Practice Round 2024",
-    text: "Welcome, participants! The contest has officially begun. You have 5 hours to solve 5 problems. Good luck!\n\nImportant reminders:\n- Read all problems carefully before starting\n- Check the constraints for each subtask\n- You have unlimited submissions\n- The scoreboard will be frozen in the last hour",
-    time: "2024-02-23 09:00:00",
-    type: "info",
-    author: "admin",
-  },
-];
+// Map priority to type for display
+function priorityToType(priority?: "low" | "normal" | "high"): "info" | "update" | "important" {
+  if (priority === "high") return "important";
+  if (priority === "low") return "info";
+  return "update";
+}
+
+function typeToPriority(type: string): "low" | "normal" | "high" {
+  if (type === "important") return "high";
+  if (type === "info") return "low";
+  return "normal";
+}
+
+export async function loader({}: Route.LoaderArgs) {
+  const dbAnnouncements = await listAnnouncements();
+
+  // Map database announcements to display format
+  const announcements = dbAnnouncements.map((a) => ({
+    id: a.announcementId,
+    title: a.title,
+    text: a.text,
+    time: a.announcementTime,
+    type: priorityToType(a.priority),
+    author: a.author || "admin",
+  }));
+
+  return { announcements };
+}
+
+export async function action({ request }: Route.ActionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get("intent") as string;
+
+  if (intent === "create") {
+    const title = formData.get("title") as string;
+    const text = formData.get("text") as string;
+    const type = formData.get("type") as string;
+
+    if (!title || !text) {
+      return data({ error: "Title and content are required" }, { status: 400 });
+    }
+
+    await createAnnouncement(title, text, "admin", typeToPriority(type));
+    return { success: true };
+  }
+
+  if (intent === "update") {
+    const id = formData.get("id") as string;
+    const title = formData.get("title") as string;
+    const text = formData.get("text") as string;
+    const type = formData.get("type") as string;
+
+    await updateAnnouncement(id, { title, text, priority: typeToPriority(type) });
+    return { success: true };
+  }
+
+  if (intent === "delete") {
+    const id = formData.get("id") as string;
+    await deleteAnnouncement(id);
+    return { success: true };
+  }
+
+  return data({ error: "Unknown action" }, { status: 400 });
+}
 
 const typeConfig = {
   important: {
@@ -127,10 +163,55 @@ const typeConfig = {
   },
 };
 
-export default function AdminAnnouncements() {
+export default function AdminAnnouncements({ loaderData }: Route.ComponentProps) {
+  const { announcements } = loaderData;
+  const submit = useSubmit();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState<number | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState<number | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
+  const [newAnnouncement, setNewAnnouncement] = useState({ title: "", text: "", type: "info" });
+  const [editAnnouncement, setEditAnnouncement] = useState({ title: "", text: "", type: "info" });
+
+  const handleCreate = () => {
+    const formData = new FormData();
+    formData.set("intent", "create");
+    formData.set("title", newAnnouncement.title);
+    formData.set("text", newAnnouncement.text);
+    formData.set("type", newAnnouncement.type);
+    submit(formData, { method: "POST" });
+    setDialogOpen(false);
+    setNewAnnouncement({ title: "", text: "", type: "info" });
+  };
+
+  const handleUpdate = () => {
+    if (!editDialogOpen) return;
+    const formData = new FormData();
+    formData.set("intent", "update");
+    formData.set("id", editDialogOpen);
+    formData.set("title", editAnnouncement.title);
+    formData.set("text", editAnnouncement.text);
+    formData.set("type", editAnnouncement.type);
+    submit(formData, { method: "POST" });
+    setEditDialogOpen(null);
+  };
+
+  const handleDelete = () => {
+    if (!deleteDialogOpen) return;
+    const formData = new FormData();
+    formData.set("intent", "delete");
+    formData.set("id", deleteDialogOpen);
+    submit(formData, { method: "POST" });
+    setDeleteDialogOpen(null);
+  };
+
+  const openEditDialog = (announcement: typeof announcements[0]) => {
+    setEditAnnouncement({
+      title: announcement.title,
+      text: announcement.text,
+      type: announcement.type,
+    });
+    setEditDialogOpen(announcement.id);
+  };
 
   return (
     <div className="space-y-6">
@@ -163,11 +244,16 @@ export default function AdminAnnouncements() {
                   <Input
                     id="title"
                     placeholder="Enter announcement title..."
+                    value={newAnnouncement.title}
+                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="type">Type</Label>
-                  <Select defaultValue="info">
+                  <Select
+                    value={newAnnouncement.type}
+                    onValueChange={(value) => setNewAnnouncement({ ...newAnnouncement, type: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
@@ -200,6 +286,8 @@ export default function AdminAnnouncements() {
                   id="content"
                   placeholder="Enter announcement content..."
                   rows={6}
+                  value={newAnnouncement.text}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, text: e.target.value })}
                 />
               </div>
             </div>
@@ -209,7 +297,7 @@ export default function AdminAnnouncements() {
               </Button>
               <Button
                 className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => setDialogOpen(false)}
+                onClick={handleCreate}
               >
                 <Send className="h-4 w-4 mr-2" />
                 Post Announcement
@@ -325,7 +413,7 @@ export default function AdminAnnouncements() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                          onClick={() => setEditDialogOpen(announcement.id)}
+                          onClick={() => openEditDialog(announcement)}
                         >
                           <Edit className="h-4 w-4 mr-2" />
                           Edit
@@ -368,17 +456,15 @@ export default function AdminAnnouncements() {
                 <Label htmlFor="edit-title">Title</Label>
                 <Input
                   id="edit-title"
-                  defaultValue={
-                    announcements.find((a) => a.id === editDialogOpen)?.title
-                  }
+                  value={editAnnouncement.title}
+                  onChange={(e) => setEditAnnouncement({ ...editAnnouncement, title: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-type">Type</Label>
                 <Select
-                  defaultValue={
-                    announcements.find((a) => a.id === editDialogOpen)?.type
-                  }
+                  value={editAnnouncement.type}
+                  onValueChange={(value) => setEditAnnouncement({ ...editAnnouncement, type: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
@@ -395,9 +481,8 @@ export default function AdminAnnouncements() {
               <Label htmlFor="edit-content">Content</Label>
               <Textarea
                 id="edit-content"
-                defaultValue={
-                  announcements.find((a) => a.id === editDialogOpen)?.text
-                }
+                value={editAnnouncement.text}
+                onChange={(e) => setEditAnnouncement({ ...editAnnouncement, text: e.target.value })}
                 rows={6}
               />
             </div>
@@ -408,7 +493,7 @@ export default function AdminAnnouncements() {
             </Button>
             <Button
               className="bg-emerald-600 hover:bg-emerald-700"
-              onClick={() => setEditDialogOpen(null)}
+              onClick={handleUpdate}
             >
               Save Changes
             </Button>
@@ -433,7 +518,7 @@ export default function AdminAnnouncements() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => setDeleteDialogOpen(null)}
+              onClick={handleDelete}
             >
               Delete
             </AlertDialogAction>

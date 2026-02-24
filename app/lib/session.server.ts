@@ -22,10 +22,9 @@ export interface SessionData {
   userId: string;
   username: string;
   role: UserRole;
-  accessToken: string;
-  refreshToken: string;
-  idToken: string;
   expiresAt: number;
+  // Note: Tokens are NOT stored in the cookie to avoid exceeding 4KB limit
+  // If you need tokens for API calls, implement a server-side session store
 }
 
 export async function getSession(request: Request): Promise<SessionData | null> {
@@ -53,15 +52,11 @@ export async function destroySession(): Promise<string> {
 }
 
 export async function requireAuth(request: Request): Promise<SessionData> {
+  const { redirect } = await import("react-router");
   const session = await getSession(request);
 
   if (!session) {
-    throw new Response("Unauthorized", {
-      status: 401,
-      headers: {
-        Location: "/login",
-      },
-    });
+    throw redirect("/login");
   }
 
   return session;

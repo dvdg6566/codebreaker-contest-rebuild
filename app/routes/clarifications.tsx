@@ -1,6 +1,6 @@
 import type { Route } from "./+types/clarifications";
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, data, useSubmit } from "react-router";
 import {
   MessageSquare,
   Plus,
@@ -37,6 +37,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
+import { getCurrentUser } from "~/lib/auth.server";
+import { getClarificationsByUser, createClarification } from "~/lib/db/clarifications.server";
+import { listValidatedProblems } from "~/lib/db/problems.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -45,68 +48,77 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-// Mock current user
-const currentUser = {
-  username: "alice_chen",
-  displayName: "Alice Chen",
-};
+export async function loader({ request }: Route.LoaderArgs) {
+  const user = await getCurrentUser(request);
 
-// Mock problems for dropdown
-const problems = [
-  { id: "graph-traversal", name: "A - Graph Traversal" },
-  { id: "dynamic-array", name: "B - Dynamic Array" },
-  { id: "segment-tree", name: "C - Segment Tree" },
-  { id: "shortest-path", name: "D - Shortest Path" },
-  { id: "string-matching", name: "E - String Matching" },
-];
+  if (!user) {
+    // Return empty state for non-logged-in users
+    return { clarifications: [], problems: [], user: null };
+  }
 
-// Mock clarifications data - filtered to current user only
-const allClarifications = [
-  {
-    id: 1,
-    username: "alice_chen",
-    displayName: "Alice Chen",
-    problem: "Graph Traversal",
-    problemId: "graph-traversal",
-    question: "Can there be multiple edges between the same pair of nodes?",
-    answer: "Yes",
-    answeredBy: "admin",
-    status: "answered",
-    time: "2024-02-23 11:45:00",
-  },
-  {
-    id: 3,
-    username: "alice_chen",
-    displayName: "Alice Chen",
-    problem: "Segment Tree",
-    problemId: "segment-tree",
-    question: "Can the range queries overlap?",
-    answer: null,
-    answeredBy: null,
-    status: "pending",
-    time: "2024-02-23 12:15:00",
-  },
-  {
-    id: 5,
-    username: "alice_chen",
-    displayName: "Alice Chen",
-    problem: null,
-    problemId: null,
-    question: "What is the time limit for each problem?",
-    answer: "Answered in task description",
-    answeredBy: "admin",
-    status: "answered",
-    time: "2024-02-23 09:30:00",
-  },
-];
+  const [userClarifications, problems] = await Promise.all([
+    getClarificationsByUser(user.username),
+    listValidatedProblems(),
+  ]);
 
-export default function Clarifications() {
-  const [askDialogOpen, setAskDialogOpen] = useState(false);
+  // Map clarifications to display format
+  const clarifications = userClarifications.map((c) => ({
+    id: `${c.askedBy}:${c.clarificationTime}`,
+    problem: problems.find((p) => p.problemName === c.problemName)?.title || null,
+    problemId: c.problemName || null,
+    question: c.question,
+    answer: c.answer || null,
+    status: c.answer ? "answered" : "pending",
+    time: c.clarificationTime,
+  }));
 
-  // Filter to current user's clarifications only
-  const clarifications = allClarifications.filter(
-    (c) => c.username === currentUser.username
+  // Map problems to display format
+  const problemList = problems.map((p) => ({
+    id: p.problemName,
+    name: p.title || p.problemName,
+  }));
+
+  return { clarifications, problems: problemList, user: { username: user.username, displayName: user.username } };
+}
+
+export async function action({ request }: Route.ActionArgs) {
+  const user = await getCurrentUser(request);
+
+  if (!user) {
+    return data({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const formData = await request.formData();
+  const question = formData.get("question") as string;
+  const problemName = formData.get("problemName") as string;
+
+  if (!question?.trim()) {
+    return data({ error: "Question is required" }, { status: 400 });
+  }
+
+  await createClarification(
+    user.username,
+    question,
+    problemName === "general" ? "" : problemName
   );
+
+  return { success: true };
+}
+
+export default function Clarifications({ loaderData }: Route.ComponentProps) {
+  const { clarifications, problems, user } = loaderData;
+  const submit = useSubmit();
+  const [askDialogOpen, setAskDialogOpen] = useState(false);
+  const [newQuestion, setNewQuestion] = useState({ problem: "general", question: "" });
+
+  const handleSubmitQuestion = () => {
+    const formData = new FormData();
+    formData.set("question", newQuestion.question);
+    formData.set("problemName", newQuestion.problem);
+    submit(formData, { method: "POST" });
+    setAskDialogOpen(false);
+    setNewQuestion({ problem: "general", question: "" });
+  };
 
   const pendingCount = clarifications.filter((c) => c.status === "pending").length;
   const answeredCount = clarifications.filter((c) => c.status === "answered").length;
@@ -139,7 +151,10 @@ export default function Clarifications() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="problem">Problem (optional)</Label>
-                <Select>
+                <Select
+                  value={newQuestion.problem}
+                  onValueChange={(value) => setNewQuestion({ ...newQuestion, problem: value })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a problem..." />
                   </SelectTrigger>
@@ -159,6 +174,8 @@ export default function Clarifications() {
                   id="question"
                   placeholder="Enter your question..."
                   rows={4}
+                  value={newQuestion.question}
+                  onChange={(e) => setNewQuestion({ ...newQuestion, question: e.target.value })}
                 />
               </div>
             </div>
@@ -168,7 +185,8 @@ export default function Clarifications() {
               </Button>
               <Button
                 className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => setAskDialogOpen(false)}
+                onClick={handleSubmitQuestion}
+                disabled={!newQuestion.question.trim()}
               >
                 <Send className="h-4 w-4 mr-2" />
                 Submit Question

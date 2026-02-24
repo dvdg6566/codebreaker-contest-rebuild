@@ -271,7 +271,13 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
   const contestUsers = Object.entries(contest.users || {}).map(([username, userStatus]) => {
     const user = allUsers.find((u) => u.username === username);
     const scores = contest.scores?.[username] || {};
-    const totalScore = Object.values(scores).reduce((sum, s) => sum + s, 0);
+    // Scores are now arrays of subtask scores - sum each problem's subtasks
+    const totalScore = Object.values(scores).reduce((sum, subtaskScores) => {
+      const problemTotal = Array.isArray(subtaskScores)
+        ? subtaskScores.reduce((s, score) => s + score, 0)
+        : 0;
+      return sum + problemTotal;
+    }, 0);
     return {
       username,
       role: user?.role || "member",

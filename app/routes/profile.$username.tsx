@@ -1,5 +1,5 @@
 import type { Route } from "./+types/profile.$username";
-import { Link, useParams } from "react-router";
+import { Link } from "react-router";
 import {
   User,
   Mail,
@@ -23,7 +23,7 @@ import {
 } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { Separator } from "~/components/ui/separator";
 import { ScoreBadge, type VerdictType } from "~/components/ui/score-badge";
 import {
@@ -42,71 +42,91 @@ export function meta({ params }: Route.MetaArgs) {
   ];
 }
 
-// Mock user data
-const userData = {
-  username: "alice_chen",
-  displayName: "Alice Chen",
-  email: "alice@example.com",
-  role: "admin",
-  joinedDate: "2023-06-15",
-  contest: "IOI Practice Round 2024",
-  contestId: "ioi-practice-2024",
-  stats: {
-    totalSubmissions: 156,
-    acceptedSubmissions: 89,
-    problemsSolved: 42,
-    contestsParticipated: 12,
-  },
-  problemScores: {
-    "graph-traversal": 100,
-    "dynamic-array": 75,
-    "segment-tree": 30,
-    "shortest-path": 50,
-    "string-matching": 0,
-  },
-  recentSubmissions: [
-    {
-      id: 1245,
-      problem: "Graph Traversal",
-      problemId: "graph-traversal",
-      verdict: "AC",
-      score: 100,
-      language: "C++ 17",
-      time: "2024-02-23 14:32:15",
-    },
-    {
-      id: 1243,
-      problem: "Segment Tree",
-      problemId: "segment-tree",
-      verdict: "WA",
-      score: 30,
-      language: "C++ 17",
-      time: "2024-02-23 14:15:20",
-    },
-    {
-      id: 1241,
-      problem: "Dynamic Array",
-      problemId: "dynamic-array",
-      verdict: "PS",
-      score: 75,
-      language: "C++ 17",
-      time: "2024-02-23 13:58:30",
-    },
-    {
-      id: 1239,
-      problem: "Shortest Path",
-      problemId: "shortest-path",
-      verdict: "TLE",
-      score: 50,
-      language: "Python 3",
-      time: "2024-02-23 13:30:00",
-    },
-  ],
-};
+export async function loader({ request, params }: Route.LoaderArgs) {
+  const { requireAuth } = await import("~/lib/auth.server");
+  const { getUser } = await import("~/lib/db/users.server");
+  const { getSubmissionsByUser, getSubmissionVerdict } = await import("~/lib/db/submissions.server");
+  const { getProblem } = await import("~/lib/db/problems.server");
+  const { getContest } = await import("~/lib/db/contests.server");
 
-export default function Profile() {
-  const params = useParams();
-  const isCurrentUser = true; // Mock - would check against logged in user
+  const session = await requireAuth(request);
+
+  const username = params.username;
+  const user = await getUser(username);
+
+  if (!user) {
+    throw new Response("User not found", { status: 404 });
+  }
+
+  // Get all submissions for this user
+  const submissions = await getSubmissionsByUser(username, 1000);
+
+  // Get contest info if assigned
+  let contestName = null;
+  if (user.contest) {
+    const contest = await getContest(user.contest);
+    contestName = contest?.contestName || user.contest;
+  }
+
+  // Calculate stats
+  const totalSubmissions = submissions.length;
+  const completedSubmissions = submissions.filter((s) => s.status.every((st) => st === 2));
+  const acceptedSubmissions = completedSubmissions.filter((s) => s.totalScore === 100).length;
+  const problemsSolved = Object.values(user.problemScores || {}).filter((score) => score === 100).length;
+
+  // Get recent submissions (last 10)
+  const recentSubmissionData = submissions.slice(0, 10);
+  const recentSubmissions = await Promise.all(
+    recentSubmissionData.map(async (sub) => {
+      const problem = await getProblem(sub.problemName);
+      const languageDisplay =
+        sub.language === "cpp"
+          ? "C++ 17"
+          : sub.language === "py"
+          ? "Python 3"
+          : sub.language === "java"
+          ? "Java"
+          : sub.language;
+
+      return {
+        id: sub.subId,
+        problem: problem?.title || sub.problemName,
+        problemId: sub.problemName,
+        verdict: getSubmissionVerdict(sub),
+        score: sub.totalScore,
+        language: languageDisplay,
+        time: sub.submissionTime,
+      };
+    })
+  );
+
+  // Check if viewing own profile
+  const isCurrentUser = session.username === username;
+
+  return {
+    userData: {
+      username: user.username,
+      displayName: user.fullname || user.username,
+      email: user.email || "",
+      role: user.role,
+      joinedDate: "", // Not tracked in current schema
+      contest: contestName,
+      contestId: user.contest || null,
+      stats: {
+        totalSubmissions,
+        acceptedSubmissions,
+        problemsSolved,
+        contestsParticipated: 1, // For contest mode, always 1
+      },
+      problemScores: user.problemScores || {},
+    },
+    recentSubmissions,
+    isCurrentUser,
+  };
+}
+
+export default function Profile({ loaderData }: Route.ComponentProps) {
+  const { userData, recentSubmissions, isCurrentUser } = loaderData;
 
   const getInitials = (name: string) => {
     return name
@@ -116,10 +136,9 @@ export default function Profile() {
       .toUpperCase();
   };
 
-  const totalScore = Object.values(userData.problemScores).reduce(
-    (sum, score) => sum + score,
-    0
-  );
+  const problemScoreValues = Object.values(userData.problemScores) as number[];
+  const totalScore = problemScoreValues.reduce((sum, score) => sum + score, 0);
+  const maxPossibleScore = problemScoreValues.length * 100;
 
   return (
     <div className="space-y-6">
@@ -144,7 +163,6 @@ export default function Profile() {
         <CardContent className="p-6">
           <div className="flex items-start gap-6">
             <Avatar className="h-24 w-24">
-              <AvatarImage src={`/avatars/${userData.username}.jpg`} />
               <AvatarFallback className="bg-violet-500 text-white text-2xl">
                 {getInitials(userData.displayName)}
               </AvatarFallback>
@@ -160,14 +178,12 @@ export default function Profile() {
               </div>
               <p className="text-muted-foreground">@{userData.username}</p>
               <div className="mt-4 flex items-center gap-6 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  {userData.email}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Joined {userData.joinedDate}
-                </div>
+                {userData.email && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    {userData.email}
+                  </div>
+                )}
                 {userData.contest && (
                   <div className="flex items-center gap-2">
                     <Trophy className="h-4 w-4" />
@@ -233,14 +249,15 @@ export default function Profile() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Current Contest Scores</CardTitle>
                 <Badge variant="outline" className="text-base px-3 py-1">
-                  Total: {totalScore} / 500
+                  Total: {totalScore}{maxPossibleScore > 0 ? ` / ${maxPossibleScore}` : ""}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {Object.entries(userData.problemScores).map(
-                  ([problemId, score], index) => {
+                  ([problemId, scoreValue], index) => {
+                    const score = scoreValue as number;
                     const problemName = problemId
                       .split("-")
                       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -303,7 +320,7 @@ export default function Profile() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {userData.recentSubmissions.map((sub) => (
+              {recentSubmissions.map((sub) => (
                 <Link
                   key={sub.id}
                   to={`/submissions/${sub.id}`}

@@ -34,14 +34,11 @@ export async function login(
   // Get user role
   const role = await getUserRole(username);
 
-  // Create session data
+  // Create session data (minimal - tokens excluded to stay under 4KB cookie limit)
   const session: SessionData = {
     userId: tokenInfo.username,
     username: tokenInfo.username,
     role,
-    accessToken: authResult.accessToken,
-    refreshToken: authResult.refreshToken,
-    idToken: authResult.idToken,
     expiresAt: Date.now() + authResult.expiresIn * 1000,
   };
 

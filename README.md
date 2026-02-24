@@ -72,6 +72,42 @@ bun start
 
 Set `USE_DYNAMODB=true` in your environment to connect to AWS DynamoDB.
 
+### Initialization Scripts
+
+After deploying your AWS infrastructure, use these scripts to set up test data:
+
+```bash
+# Create test users in Cognito (admin, alice, bob, charlie, diana)
+bun run init:users
+
+# Create test contest data in DynamoDB (users, contest, submissions)
+bun run init:testdata
+
+# Create sample problems and upload to S3 (addition, ping, prisoners)
+bun run init:problems
+
+# Run all initialization scripts in order
+bun run init:all
+```
+
+**Required environment variables:**
+```bash
+COGNITO_USER_POOL_ID=ap-southeast-1_xxxxxxxxx
+COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+AWS_REGION=ap-southeast-1
+JUDGE_NAME=codebreakercontest01
+```
+
+**Test accounts created:**
+
+| Username | Password  | Role   |
+|----------|-----------|--------|
+| admin    | P@55w0rd  | admin  |
+| alice    | P@55w0rd  | member |
+| bob      | P@55w0rd  | member |
+| charlie  | P@55w0rd  | member |
+| diana    | P@55w0rd  | member |
+
 ## Limitations
 
 Of course, it is natural that some trade-offs have to be made as compared to a system as secure and reliable as CMS. In particular, the grading fluctuations in Codebreaker have a slightly greater variance, and some of the specific memory leakages in interactive problems may not be protected against. However, at the end of the day, our goal isn't to be a completely secure gold standard, it's to provide **free and simple to use** contest management.

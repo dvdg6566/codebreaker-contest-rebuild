@@ -264,33 +264,56 @@ export async function markUserStarted(
 }
 
 /**
- * Update user's score in a contest
+ * Update user's subtask scores in a contest (IOI-style scoring)
+ *
+ * IOI-style scoring: total score = sum of best score per subtask across all submissions.
+ * Each subtask score is updated independently if the new score is better.
+ *
+ * @param subtaskScores - Array of scores for each subtask from this submission
  */
 export async function updateContestScore(
   contestId: string,
   username: string,
   problemName: string,
-  score: number
+  subtaskScores: number[]
 ): Promise<Contest | null> {
   const contest = await getContest(contestId);
   if (!contest) return null;
 
   const userScores = contest.scores?.[username] || {};
-  const currentScore = userScores[problemName] || 0;
+  const currentSubtaskScores = userScores[problemName] || [];
 
-  if (score > currentScore) {
+  // Update each subtask independently - take the maximum
+  const newSubtaskScores = subtaskScores.map((score, index) => {
+    const currentScore = currentSubtaskScores[index] || 0;
+    return Math.max(score, currentScore);
+  });
+
+  // Check if any subtask improved
+  const hasImprovement = newSubtaskScores.some(
+    (score, index) => score > (currentSubtaskScores[index] || 0)
+  );
+
+  if (hasImprovement) {
     return updateContest(contestId, {
       scores: {
         ...contest.scores,
         [username]: {
           ...userScores,
-          [problemName]: score,
+          [problemName]: newSubtaskScores,
         },
       },
     });
   }
 
   return contest;
+}
+
+/**
+ * Get user's total score for a problem (sum of best subtask scores)
+ */
+export function calculateProblemScore(subtaskScores: number[]): number {
+  return subtaskScores.reduce((sum, score) => sum + score, 0);
 }
 
 /**

@@ -168,15 +168,6 @@ export async function problemExists(problemName: string): Promise<boolean> {
 }
 
 /**
- * Validate a problem (mark as ready for submissions)
- */
-export async function validateProblem(
-  problemName: string
-): Promise<Problem | null> {
-  return updateProblem(problemName, { validated: true });
-}
-
-/**
  * Invalidate a problem (mark as not ready for submissions)
  */
 export async function invalidateProblem(
@@ -215,3 +206,96 @@ export async function updateSubtasks(
 ): Promise<Problem | null> {
   return updateProblem(problemName, { subtaskScores, subtaskDependency });
 }
+
+/**
+ * Validation result for a problem
+ */
+export interface ProblemValidationResult {
+  validated: boolean;
+  verdicts: {
+    statement: number;
+    testdata: number;
+    scoring: number;
+    checker: number;
+    grader: number;
+    attachments: number;
+    subtasks: number;
+  };
+  remarks: {
+    statement: string;
+    testdata: string;
+    scoring: string;
+    checker: string;
+    grader: string;
+    attachments: string;
+    subtasks: string;
+  };
+}
+
+/**
+ * Invoke the problem-validation Lambda to validate a problem.
+ * The Lambda checks all files and updates DynamoDB directly.
+ */
+export async function validateAndUpdateProblem(
+  problemName: string
+): Promise<ProblemValidationResult> {
+  const { LambdaClient, InvokeCommand } = await import("@aws-sdk/client-lambda");
+
+  const region = process.env.AWS_REGION || "ap-southeast-1";
+  const accountId = process.env.AWS_ACCOUNT_ID || "";
+  const judgeName = process.env.JUDGE_NAME || "codebreakercontest01";
+
+  const lambdaClient = new LambdaClient({ region });
+  const functionArn = `arn:aws:lambda:${region}:${accountId}:function:${judgeName}-problem-validation`;
+
+  const response = await lambdaClient.send(
+    new InvokeCommand({
+      FunctionName: functionArn,
+      InvocationType: "RequestResponse",
+      Payload: JSON.stringify({ problemName }),
+    })
+  );
+
+  const result = JSON.parse(new TextDecoder().decode(response.Payload));
+
+  return {
+    validated: Object.values(result.verdicts).every((v) => v === 1),
+    verdicts: result.verdicts,
+    remarks: result.remarks,
+  };
+}
+
+/**
+ * Get current validation status from problem record (without re-validating)
+ */
+export async function getValidationStatus(
+  problemName: string
+): Promise<ProblemValidationResult | null> {
+  const problem = await getProblem(problemName);
+  if (!problem) return null;
+
+  return {
+    validated: problem.validated,
+    verdicts: problem.verdicts || {
+      statement: 0,
+      testdata: 0,
+      scoring: 0,
+      checker: 0,
+      grader: 0,
+      attachments: 0,
+      subtasks: 0,
+    },
+    remarks: problem.remarks || {
+      statement: "Not validated",
+      testdata: "Not validated",
+      scoring: "Not validated",
+      checker: "Not validated",
+      grader: "Not validated",
+      attachments: "Not validated",
+      subtasks: "Not validated",
+    },
+  };
+}
+
+// Alias for backwards compatibility
+export const validateProblemFiles = getValidationStatus;
