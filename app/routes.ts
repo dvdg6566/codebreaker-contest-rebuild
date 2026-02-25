@@ -25,6 +25,10 @@ export default [
         "problems/:problemId/testdata",
         "routes/api/admin/problems.$problemId.testdata.ts"
       ),
+      route(
+        "problems/:problemId/download",
+        "routes/api/admin/problems.$problemId.download.ts"
+      ),
     ]),
     // Problem statement API (authenticated)
     route(

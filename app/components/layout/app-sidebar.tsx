@@ -15,6 +15,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { useAuth } from "~/hooks/use-auth";
+import { useNotifications } from "~/context/websocket-context";
 
 import {
   Sidebar,
@@ -115,6 +116,7 @@ export function AppSidebar() {
   const pathname = location.pathname;
   const { user, isAdmin } = useAuth();
   const fetcher = useFetcher();
+  const { unreadAnnouncementsCount, unreadClarificationsCount } = useNotifications();
 
   const isActive = (url: string) => {
     if (url === "/") {
@@ -179,20 +181,35 @@ export function AppSidebar() {
           <SidebarGroupLabel>Contest</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {contestNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
-                  >
-                    <Link to={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {contestNavItems.map((item) => {
+                // Determine badge count for this item
+                let badgeCount = 0;
+                if (item.url === "/announcements") {
+                  badgeCount = unreadAnnouncementsCount;
+                } else if (item.url === "/clarifications") {
+                  badgeCount = unreadClarificationsCount;
+                }
+
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive(item.url)}
+                      tooltip={item.title}
+                    >
+                      <Link to={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                        {badgeCount > 0 && (
+                          <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
+                            {badgeCount > 9 ? "9+" : badgeCount}
+                          </span>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -210,20 +227,33 @@ export function AppSidebar() {
               <CollapsibleContent>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {adminNavItems.map((item) => (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton
-                          asChild
-                          isActive={isActive(item.url)}
-                          tooltip={item.title}
-                        >
-                          <Link to={item.url}>
-                            <item.icon />
-                            <span>{item.title}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
+                    {adminNavItems.map((item) => {
+                      // Determine badge count for admin items
+                      let badgeCount = 0;
+                      if (item.url === "/admin/clarifications") {
+                        badgeCount = unreadClarificationsCount;
+                      }
+
+                      return (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton
+                            asChild
+                            isActive={isActive(item.url)}
+                            tooltip={item.title}
+                          >
+                            <Link to={item.url}>
+                              <item.icon />
+                              <span>{item.title}</span>
+                              {badgeCount > 0 && (
+                                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
+                                  {badgeCount > 9 ? "9+" : badgeCount}
+                                </span>
+                              )}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
                   </SidebarMenu>
                 </SidebarGroupContent>
               </CollapsibleContent>

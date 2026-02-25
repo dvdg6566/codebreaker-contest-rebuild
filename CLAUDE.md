@@ -87,3 +87,36 @@ All UI components are in `app/components/ui/` and follow shadcn/ui patterns:
 - `status-badge.tsx` - Status indicator (active, inactive, pending, error)
 - `score-badge.tsx` - Contest score verdicts (AC, WA, TLE, etc.)
 - `user-avatar.tsx` - User avatar with optional name/email display
+
+## AWS WebSocket Infrastructure
+
+Real-time notifications use AWS API Gateway WebSocket with Step Functions for parallel broadcasting.
+
+### Components
+- **DynamoDB Table** (`{judgeName}-websocket`): Stores active connections
+  - `connectionId` (PK), `username`, `accountRole` ('admin'|'member'), `expiryTime` (TTL)
+  - **GSI**: `accountRoleUsernameIndex` (PK: `accountRole`, SK: `username`) for efficient queries
+- **websocket-connections Lambda**: Handles $connect/$disconnect/message routes, manages DynamoDB
+- **websocket-invoke Lambda**: Posts messages to batched connectionIds via API Gateway
+- **websocket Step Function** (`{judgeName}-websocket`): Parallel executor for websocket-invoke
+
+### Broadcast Functions (websocket-broadcast.server.ts)
+- `announce()`: Scan all connections, notify everyone
+- `postClarification()`: Query GSI for `accountRole='admin'`, notify admins
+- `answerClarification(role, username)`: Query GSI for specific user, notify them
+
+### Broadcast Flow
+1. Query/Scan DynamoDB for connectionIds
+2. Batch into groups of 100
+3. Start Step Function with array: `[{notificationType, connectionIds}, ...]`
+4. Step Function invokes websocket-invoke Lambda for each batch (up to 1000 concurrent)
+
+### Environment Variables
+- `AWS_REGION`: ap-southeast-1
+- `JUDGE_NAME`: e.g., codebreakercontest01
+- `AWS_ACCOUNT_ID`: 927878278795
+
+### IAM Permissions Required
+- `dynamodb:Scan` on `{judgeName}-websocket` table
+- `dynamodb:Query` on `{judgeName}-websocket/index/accountRoleUsernameIndex`
+- `states:StartExecution` on `arn:aws:states:{region}:{account}:stateMachine:{judgeName}-websocket`

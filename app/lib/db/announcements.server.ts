@@ -40,13 +40,6 @@ export async function listAnnouncements(): Promise<Announcement[]> {
 }
 
 /**
- * Get announcements ordered by time (newest first)
- */
-export async function listAnnouncementsByTime(): Promise<Announcement[]> {
-  return listAnnouncements();
-}
-
-/**
  * Get an announcement by ID
  */
 export async function getAnnouncement(
@@ -59,16 +52,6 @@ export async function getAnnouncement(
     })
   );
   return (result.Item as Announcement) || null;
-}
-
-/**
- * Get announcements by priority
- */
-export async function getAnnouncementsByPriority(
-  priority: "low" | "normal" | "high"
-): Promise<Announcement[]> {
-  const all = await listAnnouncements();
-  return all.filter((a) => a.priority === priority);
 }
 
 /**
@@ -154,19 +137,11 @@ export async function deleteAnnouncement(
 }
 
 /**
- * Get announcement count
- */
-export async function countAnnouncements(): Promise<number> {
-  const all = await listAnnouncements();
-  return all.length;
-}
-
-/**
  * Get recent announcements (last N)
  */
 export async function getRecentAnnouncements(
   limit: number
 ): Promise<Announcement[]> {
-  const sorted = await listAnnouncementsByTime();
+  const sorted = await listAnnouncements();
   return sorted.slice(0, limit);
 }

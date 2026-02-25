@@ -10,13 +10,17 @@ import {
 import type { Route } from "./+types/root";
 import "./app.css";
 import { AuthProvider, type User } from "~/context/auth-context";
+import { WebSocketProvider } from "~/context/websocket-context";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { getCurrentUser } = await import("~/lib/auth.server");
   const session = await getCurrentUser(request);
 
+  // Get WebSocket endpoint from environment
+  const wsEndpoint = process.env.API_GATEWAY_LINK || null;
+
   if (!session) {
-    return { user: null };
+    return { user: null, wsEndpoint };
   }
 
   const user: User = {
@@ -25,7 +29,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     role: session.role,
   };
 
-  return { user };
+  return { user, wsEndpoint };
 }
 
 export const links: Route.LinksFunction = () => [
@@ -60,11 +64,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App({ loaderData }: Route.ComponentProps) {
-  const { user } = loaderData;
+  const { user, wsEndpoint } = loaderData;
 
   return (
     <AuthProvider user={user}>
-      <Outlet />
+      <WebSocketProvider wsEndpoint={wsEndpoint}>
+        <Outlet />
+      </WebSocketProvider>
     </AuthProvider>
   );
 }

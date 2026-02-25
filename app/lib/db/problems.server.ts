@@ -4,7 +4,7 @@
  * Provides CRUD operations for problems using DynamoDB.
  */
 
-import type { Problem, ProblemType } from "~/types/database";
+import type { Problem } from "~/types/database";
 import { DEFAULT_PROBLEM, getMaxScore } from "~/types/database";
 import {
   docClient,
@@ -12,7 +12,6 @@ import {
   GetCommand,
   PutCommand,
   UpdateCommand,
-  DeleteCommand,
   ScanCommand,
 } from "./dynamodb-client.server";
 
@@ -50,36 +49,6 @@ export async function getProblem(problemName: string): Promise<Problem | null> {
     })
   );
   return (result.Item as Problem) || null;
-}
-
-/**
- * Get problems by type
- */
-export async function getProblemsByType(
-  problemType: ProblemType
-): Promise<Problem[]> {
-  const problems = await listProblems();
-  return problems.filter((p) => p.problem_type === problemType);
-}
-
-/**
- * Get problems by difficulty
- */
-export async function getProblemsByDifficulty(
-  difficulty: "easy" | "medium" | "hard"
-): Promise<Problem[]> {
-  const problems = await listProblems();
-  return problems.filter((p) => p.difficulty === difficulty);
-}
-
-/**
- * Get problems by tags
- */
-export async function getProblemsByTags(tags: string[]): Promise<Problem[]> {
-  const problems = await listProblems();
-  return problems.filter((p) =>
-    tags.some((tag) => p.tags?.includes(tag))
-  );
 }
 
 /**
@@ -144,27 +113,6 @@ export async function updateProblem(
   );
 
   return (result.Attributes as Problem) || null;
-}
-
-/**
- * Delete a problem
- */
-export async function deleteProblem(problemName: string): Promise<boolean> {
-  await docClient.send(
-    new DeleteCommand({
-      TableName: TableNames.problems,
-      Key: { problemName },
-    })
-  );
-  return true;
-}
-
-/**
- * Check if problem exists
- */
-export async function problemExists(problemName: string): Promise<boolean> {
-  const problem = await getProblem(problemName);
-  return problem !== null;
 }
 
 /**
@@ -274,26 +222,34 @@ export async function getValidationStatus(
   const problem = await getProblem(problemName);
   if (!problem) return null;
 
+  const verdicts = problem.verdicts || {
+    statement: 0,
+    testdata: 0,
+    scoring: 0,
+    checker: 0,
+    grader: 0,
+    attachments: 0,
+    subtasks: 0,
+  };
+
+  const remarks = problem.remarks || {
+    statement: "Not validated",
+    testdata: "Not validated",
+    scoring: "Not validated",
+    checker: "Not validated",
+    grader: "Not validated",
+    attachments: "Not validated",
+    subtasks: "Not validated",
+  };
+
+  // Compute validated from verdicts, not the database field
+  // This ensures consistency even if the database is out of sync
+  const validated = Object.values(verdicts).every((v) => v === 1);
+
   return {
-    validated: problem.validated,
-    verdicts: problem.verdicts || {
-      statement: 0,
-      testdata: 0,
-      scoring: 0,
-      checker: 0,
-      grader: 0,
-      attachments: 0,
-      subtasks: 0,
-    },
-    remarks: problem.remarks || {
-      statement: "Not validated",
-      testdata: "Not validated",
-      scoring: "Not validated",
-      checker: "Not validated",
-      grader: "Not validated",
-      attachments: "Not validated",
-      subtasks: "Not validated",
-    },
+    validated,
+    verdicts,
+    remarks,
   };
 }
 

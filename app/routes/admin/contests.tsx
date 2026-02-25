@@ -1,5 +1,5 @@
 import type { Route } from "./+types/contests";
-import { Form, Link, useNavigation } from "react-router";
+import { Form, Link, useNavigation, redirect } from "react-router";
 import { format } from "date-fns";
 import {
   Plus,
@@ -120,7 +120,8 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     await createContest(contestId);
-    return { success: true, message: "Contest created successfully" };
+    // Redirect to edit the newly created contest
+    return redirect(`/admin/contests/${contestId}`);
   }
 
   if (intent === "delete") {

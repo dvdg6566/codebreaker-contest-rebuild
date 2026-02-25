@@ -4,19 +4,10 @@ import {
   authenticate,
   getUserRole,
   parseIdToken,
-  isMockMode,
   type UserRole,
 } from "./auth-service.server";
 
 export type { SessionData, UserRole };
-
-// Log mode on startup
-if (isMockMode) {
-  console.log("🔧 Running in MOCK MODE - using mock authentication with DynamoDB users");
-  console.log("   Login with any DynamoDB user using password: <username>123 or password123");
-} else {
-  console.log("☁️  Running with AWS Cognito authentication");
-}
 
 /**
  * Login user and create session

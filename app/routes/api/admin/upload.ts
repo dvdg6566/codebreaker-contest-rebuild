@@ -19,6 +19,8 @@ interface UploadResult {
   success: boolean;
   key?: string;
   error?: string;
+  compiled?: boolean;
+  compileError?: string;
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -90,7 +92,17 @@ export async function action({ request }: Route.ActionArgs) {
           );
         }
         const key = await uploadChecker(problemName, buffer);
-        result = { success: true, key };
+
+        // Compile the checker after upload
+        const { compileChecker } = await import("~/lib/grading.server");
+        const compileResult = await compileChecker(problemName);
+
+        result = {
+          success: true,
+          key,
+          compiled: compileResult.success,
+          compileError: compileResult.error || undefined,
+        };
         break;
       }
 

@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Files,
   Loader2,
+  Download,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -174,8 +175,8 @@ export default function TestdataPage({ loaderData }: Route.ComponentProps) {
         errors.push(`Invalid filename: ${file.name} (must be N.in or N.out)`);
         continue;
       }
-      if (file.size > 128 * 1024 * 1024) {
-        errors.push(`File too large: ${file.name} (max 128MB)`);
+      if (file.size > 5 * 1024 * 1024 * 1024) {
+        errors.push(`File too large: ${file.name} (max 5GB)`);
         continue;
       }
       validFiles.push(file);
@@ -393,6 +394,40 @@ export default function TestdataPage({ loaderData }: Route.ComponentProps) {
     }
   };
 
+  const handleDownload = async (testcaseNumber: number, type: "in" | "out") => {
+    try {
+      const response = await fetch(
+        `/api/admin/problems/${problemId}/testdata?intent=download&testcase=${testcaseNumber}&type=${type}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to get download URL");
+      }
+
+      const { url, content } = await response.json();
+
+      if (content !== undefined) {
+        // Direct content download (small files)
+        const blob = new Blob([content], { type: "text/plain" });
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = `${testcaseNumber}.${type}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+      } else if (url) {
+        // Presigned URL download (large files)
+        window.open(url, "_blank");
+      }
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : "Download failed"
+      );
+    }
+  };
+
   const validTestcases = testcases.filter((tc) => tc.hasInput && tc.hasOutput);
   const incompleteTestcases = testcases.filter(
     (tc) => !tc.hasInput || !tc.hasOutput
@@ -582,7 +617,7 @@ export default function TestdataPage({ loaderData }: Route.ComponentProps) {
 
             <p className="text-xs text-muted-foreground">
               Files must be named as N.in or N.out where N is a positive integer
-              (e.g., 1.in, 1.out, 2.in, 2.out). Max file size: 128MB.
+              (e.g., 1.in, 1.out, 2.in, 2.out). Max file size: 5GB.
             </p>
           </div>
 
@@ -641,6 +676,7 @@ export default function TestdataPage({ loaderData }: Route.ComponentProps) {
                   <TableHead className="w-32">Input</TableHead>
                   <TableHead className="w-32">Output</TableHead>
                   <TableHead className="w-28">Status</TableHead>
+                  <TableHead className="w-32">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -689,6 +725,32 @@ export default function TestdataPage({ loaderData }: Route.ComponentProps) {
                       ) : (
                         <Badge variant="destructive">Incomplete</Badge>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        {tc.hasInput && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDownload(tc.number, "in")}
+                            title={`Download ${tc.number}.in`}
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            .in
+                          </Button>
+                        )}
+                        {tc.hasOutput && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDownload(tc.number, "out")}
+                            title={`Download ${tc.number}.out`}
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            .out
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

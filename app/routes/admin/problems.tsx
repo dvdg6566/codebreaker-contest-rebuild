@@ -16,13 +16,20 @@ export async function loader({}: Route.LoaderArgs) {
   const problems = await listProblems();
 
   // Map database problems to display format
-  const problemList: ProblemListItem[] = problems.map((p) => ({
-    problemName: p.problemName,
-    title: p.title || p.problemName,
-    problem_type: p.problem_type,
-    validated: p.validated,
-    yourScore: 0, // Admin doesn't have scores
-  }));
+  // Compute validated from verdicts to ensure consistency
+  const problemList: ProblemListItem[] = problems.map((p) => {
+    const verdicts = p.verdicts || {};
+    const validated = Object.keys(verdicts).length > 0 &&
+      Object.values(verdicts).every((v) => v === 1);
+
+    return {
+      problemName: p.problemName,
+      title: p.title || p.problemName,
+      problem_type: p.problem_type,
+      validated,
+      yourScore: 0, // Admin doesn't have scores
+    };
+  });
 
   return { problems: problemList };
 }

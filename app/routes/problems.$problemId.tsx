@@ -14,6 +14,7 @@ import {
   AlertCircle,
   XCircle,
   Loader2,
+  Edit,
 } from "lucide-react";
 import {
   Card,
@@ -137,6 +138,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     recentSubmissions,
     languages: getLanguageOptions(),
     username: session.username,
+    isAdmin: session.role === "admin",
   };
 }
 
@@ -215,7 +217,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function ProblemDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { problemData, recentSubmissions, languages, username } = loaderData;
+  const { problemData, recentSubmissions, languages, username, isAdmin } = loaderData;
   const fetcher = useFetcher();
   const [selectedLanguage, setSelectedLanguage] = React.useState<string>(languages[0]?.label || "C++ 17");
   const [code, setCode] = React.useState("");
@@ -283,6 +285,14 @@ export default function ProblemDetail({ loaderData, actionData }: Route.Componen
               {problemData.type === "Communication" && (
                 <Badge variant="secondary">Communication</Badge>
               )}
+              {isAdmin && (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to={`/admin/problems/${problemData.id}`}>
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                  </Link>
+                </Button>
+              )}
             </div>
             <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
               <span>Author: {problemData.author}</span>
@@ -319,10 +329,6 @@ export default function ProblemDetail({ loaderData, actionData }: Route.Componen
                 </div>
               ) : problemData.statementPdfUrl ? (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileText className="h-4 w-4" />
-                    <span>This problem has a PDF statement.</span>
-                  </div>
                   <iframe
                     src={problemData.statementPdfUrl}
                     className="w-full h-[600px] border rounded-lg"

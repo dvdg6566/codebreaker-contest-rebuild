@@ -53,6 +53,45 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     }
   }
 
+  // Handle testcase download
+  if (intent === "download") {
+    const testcase = parseInt(url.searchParams.get("testcase") || "", 10);
+    const type = url.searchParams.get("type") as "in" | "out";
+
+    if (isNaN(testcase) || testcase < 1) {
+      return Response.json({ error: "Invalid testcase number" }, { status: 400 });
+    }
+
+    if (type !== "in" && type !== "out") {
+      return Response.json({ error: "type must be 'in' or 'out'" }, { status: 400 });
+    }
+
+    try {
+      const { downloadFile, BucketNames } = await import("~/lib/s3.server");
+      const key = `${problemName}/${testcase}.${type}`;
+
+      // Download the file content directly
+      const buffer = await downloadFile(BucketNames.testdata, key);
+      const content = buffer.toString("utf-8");
+
+      return Response.json({ content });
+    } catch (error) {
+      // If file doesn't exist or error, try presigned URL fallback
+      try {
+        const urls = await getTestcaseUrls(problemName, testcase);
+        const downloadUrl = type === "in" ? urls.input : urls.output;
+
+        if (!downloadUrl) {
+          return Response.json({ error: "Testcase file not found" }, { status: 404 });
+        }
+
+        return Response.json({ url: downloadUrl });
+      } catch {
+        return Response.json({ error: "Failed to download testcase" }, { status: 500 });
+      }
+    }
+  }
+
   const withUrls = url.searchParams.get("withUrls") === "true";
 
   // List testcases

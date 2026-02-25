@@ -45,9 +45,11 @@ import { ClientOnly } from "~/components/ui/client-only";
 import {
   listClarifications,
   answerClarification,
+  getClarification,
 } from "~/lib/db/clarifications.server";
 import { getUser } from "~/lib/db/users.server";
 import { getProblem } from "~/lib/db/problems.server";
+import { broadcastClarificationAnswer } from "~/lib/websocket-broadcast.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -95,10 +97,23 @@ export async function action({ request }: Route.ActionArgs) {
       return data({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Parse the composite ID
-    const [askedBy, clarificationTime] = id.split(":");
+    // Parse the composite ID (split only on first colon since timestamp contains colons)
+    const colonIndex = id.indexOf(":");
+    const askedBy = id.substring(0, colonIndex);
+    const clarificationTime = id.substring(colonIndex + 1);
+
+    // Get the clarification to find the problemName for the notification
+    const clarification = await getClarification(askedBy, clarificationTime);
 
     await answerClarification(askedBy, clarificationTime, answer, "admin");
+
+    // Notify the user that their question was answered
+    await broadcastClarificationAnswer(
+      askedBy,
+      answer,
+      clarification?.problemName || undefined
+    );
+
     return { success: true };
   }
 

@@ -15,6 +15,7 @@ interface FileDropzoneProps {
   description?: string;
   files: UploadedFile[];
   onFilesChange: (files: UploadedFile[]) => void;
+  onRawFilesChange?: (files: File[]) => void;
   multiple?: boolean;
   className?: string;
 }
@@ -45,10 +46,12 @@ export function FileDropzone({
   description,
   files,
   onFilesChange,
+  onRawFilesChange,
   multiple = false,
   className,
 }: FileDropzoneProps) {
   const [isDragging, setIsDragging] = React.useState(false);
+  const [rawFiles, setRawFiles] = React.useState<File[]>([]);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -94,8 +97,13 @@ export function FileDropzone({
 
     if (multiple) {
       onFilesChange([...files, ...newFiles]);
+      const newRawFiles = [...rawFiles, ...validFiles];
+      setRawFiles(newRawFiles);
+      onRawFilesChange?.(newRawFiles);
     } else {
       onFilesChange(newFiles.slice(0, 1));
+      setRawFiles(validFiles.slice(0, 1));
+      onRawFilesChange?.(validFiles.slice(0, 1));
     }
   };
 
@@ -109,6 +117,9 @@ export function FileDropzone({
 
   const handleRemoveFile = (index: number) => {
     onFilesChange(files.filter((_, i) => i !== index));
+    const newRawFiles = rawFiles.filter((_, i) => i !== index);
+    setRawFiles(newRawFiles);
+    onRawFilesChange?.(newRawFiles);
   };
 
   const handleClick = () => {

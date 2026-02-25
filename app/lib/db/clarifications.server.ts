@@ -38,13 +38,6 @@ export async function listClarifications(): Promise<Clarification[]> {
 }
 
 /**
- * Get clarifications ordered by time (newest first)
- */
-export async function listClarificationsByTime(): Promise<Clarification[]> {
-  return listClarifications();
-}
-
-/**
  * Get a clarification by its composite key
  */
 export async function getClarification(
@@ -77,32 +70,6 @@ export async function getClarificationsByUser(
     })
   );
   return (result.Items || []) as Clarification[];
-}
-
-/**
- * Get clarifications by problem
- */
-export async function getClarificationsByProblem(
-  problemName: string
-): Promise<Clarification[]> {
-  const all = await listClarifications();
-  return all.filter((c) => c.problemName === problemName);
-}
-
-/**
- * Get pending clarifications (unanswered)
- */
-export async function getPendingClarifications(): Promise<Clarification[]> {
-  const all = await listClarifications();
-  return all.filter((c) => c.answer === "");
-}
-
-/**
- * Get answered clarifications
- */
-export async function getAnsweredClarifications(): Promise<Clarification[]> {
-  const all = await listClarifications();
-  return all.filter((c) => c.answer !== "");
 }
 
 /**
@@ -231,12 +198,3 @@ export async function countUserClarifications(
   };
 }
 
-/**
- * Transform clarification for display (with computed status)
- */
-export function formatClarificationForDisplay(clarification: Clarification) {
-  return {
-    ...clarification,
-    status: getClarificationStatus(clarification),
-  };
-}

@@ -6,7 +6,6 @@ import type { Contest, ContestMode, ContestStatus } from "~/types/database";
 import { parseDateTime, isDateTimeNotSet } from "~/types/database";
 import {
   getContest as dbGetContest,
-  listContests,
   getContestStatus,
   updateContest as dbUpdateContest,
 } from "./db/index.server";
@@ -53,13 +52,6 @@ export async function getActiveContest(username: string): Promise<Contest | null
   }
 
   return null;
-}
-
-/**
- * Get all available contests
- */
-export async function getAllContests(): Promise<Contest[]> {
-  return listContests();
 }
 
 /**

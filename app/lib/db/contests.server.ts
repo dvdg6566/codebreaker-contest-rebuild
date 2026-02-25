@@ -82,24 +82,6 @@ export async function getContestWithStatus(
 }
 
 /**
- * Get contests by status
- */
-export async function getContestsByStatus(
-  status: ContestStatus
-): Promise<Contest[]> {
-  const contests = await listContests();
-  return contests.filter((c) => getContestStatus(c) === status);
-}
-
-/**
- * Get public contests
- */
-export async function getPublicContests(): Promise<Contest[]> {
-  const contests = await listContests();
-  return contests.filter((c) => c.public);
-}
-
-/**
  * Create a new contest
  */
 export async function createContest(
@@ -173,14 +155,6 @@ export async function deleteContest(contestId: string): Promise<boolean> {
     })
   );
   return true;
-}
-
-/**
- * Check if contest exists
- */
-export async function contestExists(contestId: string): Promise<boolean> {
-  const contest = await getContest(contestId);
-  return contest !== null;
 }
 
 /**
@@ -316,10 +290,3 @@ export function calculateProblemScore(subtaskScores: number[]): number {
   return subtaskScores.reduce((sum, score) => sum + score, 0);
 }
 
-/**
- * Get the active/ongoing contest
- */
-export async function getActiveContest(): Promise<Contest | null> {
-  const contests = await listContestsWithStatus();
-  return contests.find((c) => c.status === "ONGOING") || null;
-}

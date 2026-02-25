@@ -26,10 +26,12 @@ import {
   XCircle,
   ExternalLink,
   FileCode,
+  FileText,
   Clock,
   HardDrive,
   Layers,
   ShieldCheck,
+  Download,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -80,6 +82,13 @@ export function meta({ params }: Route.MetaArgs) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { requireAdmin } = await import("~/lib/auth.server");
   const { getProblem, validateProblemFiles } = await import("~/lib/db/problems.server");
+  const {
+    checkStatementExists,
+    checkerSourceExists,
+    checkerIsCompiled,
+    listGraderFiles,
+    attachmentExists,
+  } = await import("~/lib/s3.server");
 
   await requireAdmin(request);
 
@@ -93,12 +102,44 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // Get validation status (cached from DynamoDB, doesn't re-validate)
   const validation = await validateProblemFiles(problemName);
 
+  // Fetch existing file info in parallel
+  const [statementExists, hasCheckerSource, hasCompiledChecker, graderFiles, hasAttachment] = await Promise.all([
+    checkStatementExists(problemName),
+    checkerSourceExists(problemName),
+    checkerIsCompiled(problemName),
+    listGraderFiles(problemName),
+    attachmentExists(problemName),
+  ]);
+
+  // Build existing files info (URLs generated on-demand when download is clicked)
+  const existingFiles: {
+    statements: { name: string; format: "html" | "pdf" }[];
+    checker: { source: boolean; compiled: boolean };
+    graders: string[];
+    attachment: { exists: boolean };
+  } = {
+    statements: [],
+    checker: { source: hasCheckerSource, compiled: hasCompiledChecker },
+    graders: graderFiles,
+    attachment: { exists: hasAttachment },
+  };
+
+  // Record which statement formats exist
+  if (statementExists.html) {
+    existingFiles.statements.push({ name: `${problemName}.html`, format: "html" });
+  }
+  if (statementExists.pdf) {
+    existingFiles.statements.push({ name: `${problemName}.pdf`, format: "pdf" });
+  }
+
   return {
     problem: {
       ...problem,
+      validated: validation?.validated ?? problem.validated,
       verdicts: validation?.verdicts || problem.verdicts,
       remarks: validation?.remarks || problem.remarks,
     },
+    existingFiles,
   };
 }
 
@@ -205,7 +246,7 @@ const problemOptions = [
 ];
 
 export default function EditProblemPage({ loaderData, actionData }: Route.ComponentProps) {
-  const { problem: initialProblem } = loaderData;
+  const { problem: initialProblem, existingFiles } = loaderData;
   const fetcher = useFetcher();
   const revalidator = useRevalidator();
 
@@ -231,6 +272,13 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
     );
   }, [initialProblem]);
 
+  // Revalidate loader data after fetcher completes (e.g., after validation)
+  React.useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data) {
+      revalidator.revalidate();
+    }
+  }, [fetcher.state, fetcher.data]);
+
   const isLoading = fetcher.state !== "idle";
 
   // DnD sensors for drag and drop
@@ -241,7 +289,7 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
     })
   );
 
-  // File upload state
+  // File upload state (metadata for display)
   const [statementFiles, setStatementFiles] = React.useState<UploadedFile[]>([]);
   const [checkerFiles, setCheckerFiles] = React.useState<UploadedFile[]>([]);
   const [graderFiles, setGraderFiles] = React.useState<UploadedFile[]>([]);
@@ -249,6 +297,156 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
   const [headerAFiles, setHeaderAFiles] = React.useState<UploadedFile[]>([]);
   const [headerBFiles, setHeaderBFiles] = React.useState<UploadedFile[]>([]);
   const [attachmentFiles, setAttachmentFiles] = React.useState<UploadedFile[]>([]);
+
+  // Raw File objects for upload
+  const [statementRawFiles, setStatementRawFiles] = React.useState<File[]>([]);
+  const [checkerRawFiles, setCheckerRawFiles] = React.useState<File[]>([]);
+  const [graderRawFiles, setGraderRawFiles] = React.useState<File[]>([]);
+  const [headerRawFiles, setHeaderRawFiles] = React.useState<File[]>([]);
+  const [headerARawFiles, setHeaderARawFiles] = React.useState<File[]>([]);
+  const [headerBRawFiles, setHeaderBRawFiles] = React.useState<File[]>([]);
+  const [attachmentRawFiles, setAttachmentRawFiles] = React.useState<File[]>([]);
+
+  // Upload status state
+  const [uploadStatus, setUploadStatus] = React.useState<{
+    type: string;
+    success: boolean;
+    message: string;
+    compileError?: string;
+  } | null>(null);
+  const [isUploading, setIsUploading] = React.useState(false);
+
+  // Download file handler - fetches presigned URL on demand
+  const handleDownload = async (type: string, name?: string) => {
+    try {
+      const params = new URLSearchParams({ type });
+      if (name) params.append("name", name);
+
+      const response = await fetch(
+        `/api/admin/problems/${problem.problemName}/download?${params}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to get download URL");
+      }
+
+      const { url } = await response.json();
+      window.open(url, "_blank");
+    } catch (error) {
+      console.error("Download failed:", error);
+    }
+  };
+
+  // Clear file state after successful upload
+  const clearFileState = (type: string) => {
+    switch (type) {
+      case "statement":
+        setStatementFiles([]);
+        setStatementRawFiles([]);
+        break;
+      case "checker":
+        setCheckerFiles([]);
+        setCheckerRawFiles([]);
+        break;
+      case "grader":
+        setGraderFiles([]);
+        setGraderRawFiles([]);
+        break;
+      case "header":
+        setHeaderFiles([]);
+        setHeaderRawFiles([]);
+        break;
+      case "headerA":
+        setHeaderAFiles([]);
+        setHeaderARawFiles([]);
+        break;
+      case "headerB":
+        setHeaderBFiles([]);
+        setHeaderBRawFiles([]);
+        break;
+      case "attachment":
+        setAttachmentFiles([]);
+        setAttachmentRawFiles([]);
+        break;
+    }
+  };
+
+  // Upload file handler
+  const handleUploadFile = async (
+    type: "statement" | "checker" | "grader" | "header" | "attachment",
+    rawFiles: File[],
+    stateType: string,
+    extraParams?: { filename?: string }
+  ) => {
+    if (rawFiles.length === 0) {
+      setUploadStatus({
+        type: stateType,
+        success: false,
+        message: "No file selected",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadStatus(null);
+
+    const file = rawFiles[0];
+    const formData = new FormData();
+    formData.append("problemName", problem.problemName);
+    formData.append("type", type);
+    formData.append("file", file);
+    if (extraParams?.filename) {
+      formData.append("filename", extraParams.filename);
+    }
+
+    try {
+      const response = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        setUploadStatus({
+          type: stateType,
+          success: false,
+          message: result.error || "Upload failed",
+        });
+        return;
+      }
+
+      if (type === "checker") {
+        setUploadStatus({
+          type: stateType,
+          success: result.compiled,
+          message: result.compiled
+            ? "Checker uploaded and compiled successfully"
+            : "Checker uploaded but compilation failed",
+          compileError: result.compileError,
+        });
+      } else {
+        setUploadStatus({
+          type: stateType,
+          success: result.success,
+          message: result.success
+            ? `${type.charAt(0).toUpperCase() + type.slice(1)} uploaded successfully`
+            : result.error,
+        });
+      }
+
+      // Clear file selection and refresh data
+      clearFileState(stateType);
+      revalidator.revalidate();
+    } catch (error) {
+      setUploadStatus({
+        type: stateType,
+        success: false,
+        message: error instanceof Error ? error.message : "Upload failed",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Compute selected options from problem state
   const selectedOptions = React.useMemo(() => {
@@ -429,6 +627,28 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
         </div>
       )}
 
+      {/* Upload status message */}
+      {uploadStatus && (
+        <div className={`p-3 rounded-lg text-sm ${uploadStatus.success ? "bg-emerald-50 border border-emerald-200 text-emerald-700" : "bg-red-50 border border-red-200 text-red-600"}`}>
+          <div className="flex items-center gap-2">
+            {uploadStatus.success ? (
+              <CheckCircle2 className="h-4 w-4" />
+            ) : (
+              <XCircle className="h-4 w-4" />
+            )}
+            {uploadStatus.message}
+          </div>
+          {uploadStatus.compileError && (
+            <div className="mt-2">
+              <p className="font-medium mb-1">Compiler Output:</p>
+              <pre className="bg-red-100 p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap font-mono">
+                {uploadStatus.compileError}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Stats Row */}
       <div className="grid grid-cols-5 gap-4">
         {stats.map((stat) => (
@@ -566,79 +786,260 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
             <CardTitle>Statements and Files</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Existing Statements */}
+            {existingFiles.statements.length > 0 && (
+              <div className="space-y-2">
+                <Label>Existing Statements</Label>
+                <div className="flex flex-wrap gap-2">
+                  {existingFiles.statements.map((file) => (
+                    <button
+                      key={file.name}
+                      type="button"
+                      onClick={() => handleDownload("statement", file.name)}
+                      className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
+                    >
+                      <FileText className="h-4 w-4" />
+                      {file.name}
+                      <Download className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Statement Upload */}
-            <FileDropzone
-              label="Problem Statement"
-              accept=".html,.pdf"
-              description="HTML or PDF format"
-              files={statementFiles}
-              onFilesChange={setStatementFiles}
-              multiple
-            />
+            <div className="space-y-2">
+              <FileDropzone
+                label="Upload New Statement"
+                accept=".html,.pdf"
+                description="HTML or PDF format (will replace existing)"
+                files={statementFiles}
+                onFilesChange={setStatementFiles}
+                onRawFilesChange={setStatementRawFiles}
+                multiple
+              />
+              {statementRawFiles.length > 0 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleUploadFile("statement", statementRawFiles, "statement")}
+                  disabled={isUploading}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Statement
+                </Button>
+              )}
+            </div>
+
+            {/* Existing Checker */}
+            {problem.customChecker && existingFiles.checker.source && (
+              <div className="space-y-2">
+                <Label>Existing Checker</Label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDownload("checker")}
+                    className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
+                  >
+                    <FileText className="h-4 w-4" />
+                    {problem.problemName}.cpp
+                    <Download className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                  <Badge variant={existingFiles.checker.compiled ? "success" : "secondary"}>
+                    {existingFiles.checker.compiled ? "Compiled" : "Not Compiled"}
+                  </Badge>
+                </div>
+              </div>
+            )}
 
             {/* Checker Upload - only if custom checker enabled */}
             {problem.customChecker && (
-              <FileDropzone
-                label="Custom Checker"
-                accept=".cpp"
-                description="C++ source file"
-                files={checkerFiles}
-                onFilesChange={setCheckerFiles}
-              />
+              <div className="space-y-2">
+                <FileDropzone
+                  label="Upload New Checker"
+                  accept=".cpp"
+                  description="C++ source file (will replace existing and auto-compile)"
+                  files={checkerFiles}
+                  onFilesChange={setCheckerFiles}
+                  onRawFilesChange={setCheckerRawFiles}
+                />
+                {checkerRawFiles.length > 0 && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleUploadFile("checker", checkerRawFiles, "checker")}
+                    disabled={isUploading}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload & Compile Checker
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Existing Graders */}
+            {(problem.problem_type === "Interactive" ||
+              problem.problem_type === "Communication") &&
+              existingFiles.graders.length > 0 && (
+              <div className="space-y-2">
+                <Label>Existing Grader Files</Label>
+                <div className="flex flex-wrap gap-2">
+                  {existingFiles.graders.map((fileName) => (
+                    <button
+                      key={fileName}
+                      type="button"
+                      onClick={() => handleDownload("grader", fileName)}
+                      className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
+                    >
+                      <FileText className="h-4 w-4" />
+                      {fileName}
+                      <Download className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Grader Upload - for Interactive/Communication */}
             {(problem.problem_type === "Interactive" ||
               problem.problem_type === "Communication") && (
               <>
-                <FileDropzone
-                  label="Grader"
-                  accept=".cpp"
-                  description="C++ source file"
-                  files={graderFiles}
-                  onFilesChange={setGraderFiles}
-                />
+                <div className="space-y-2">
+                  <FileDropzone
+                    label="Upload New Grader"
+                    accept=".cpp"
+                    description="C++ source file"
+                    files={graderFiles}
+                    onFilesChange={setGraderFiles}
+                    onRawFilesChange={setGraderRawFiles}
+                  />
+                  {graderRawFiles.length > 0 && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleUploadFile("grader", graderRawFiles, "grader")}
+                      disabled={isUploading}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Grader
+                    </Button>
+                  )}
+                </div>
 
                 {problem.problem_type === "Interactive" && (
-                  <FileDropzone
-                    label="Header File"
-                    accept=".h"
-                    description="C/C++ header file"
-                    files={headerFiles}
-                    onFilesChange={setHeaderFiles}
-                  />
+                  <div className="space-y-2">
+                    <FileDropzone
+                      label="Header File"
+                      accept=".h"
+                      description="C/C++ header file"
+                      files={headerFiles}
+                      onFilesChange={setHeaderFiles}
+                      onRawFilesChange={setHeaderRawFiles}
+                    />
+                    {headerRawFiles.length > 0 && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleUploadFile("header", headerRawFiles, "header", { filename: `${problem.problemName}.h` })}
+                        disabled={isUploading}
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload Header
+                      </Button>
+                    )}
+                  </div>
                 )}
 
                 {problem.problem_type === "Communication" && (
                   <>
-                    <FileDropzone
-                      label={`${problem.nameA || "FileA"} Header`}
-                      accept=".h"
-                      description="C/C++ header file"
-                      files={headerAFiles}
-                      onFilesChange={setHeaderAFiles}
-                    />
-                    <FileDropzone
-                      label={`${problem.nameB || "FileB"} Header`}
-                      accept=".h"
-                      description="C/C++ header file"
-                      files={headerBFiles}
-                      onFilesChange={setHeaderBFiles}
-                    />
+                    <div className="space-y-2">
+                      <FileDropzone
+                        label={`${problem.nameA || "FileA"} Header`}
+                        accept=".h"
+                        description="C/C++ header file"
+                        files={headerAFiles}
+                        onFilesChange={setHeaderAFiles}
+                        onRawFilesChange={setHeaderARawFiles}
+                      />
+                      {headerARawFiles.length > 0 && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleUploadFile("header", headerARawFiles, "headerA", { filename: `${problem.nameA || "fileA"}.h` })}
+                          disabled={isUploading}
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Upload {problem.nameA || "FileA"} Header
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <FileDropzone
+                        label={`${problem.nameB || "FileB"} Header`}
+                        accept=".h"
+                        description="C/C++ header file"
+                        files={headerBFiles}
+                        onFilesChange={setHeaderBFiles}
+                        onRawFilesChange={setHeaderBRawFiles}
+                      />
+                      {headerBRawFiles.length > 0 && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleUploadFile("header", headerBRawFiles, "headerB", { filename: `${problem.nameB || "fileB"}.h` })}
+                          disabled={isUploading}
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Upload {problem.nameB || "FileB"} Header
+                        </Button>
+                      )}
+                    </div>
                   </>
                 )}
               </>
             )}
 
+            {/* Existing Attachment */}
+            {problem.attachments && existingFiles.attachment.exists && (
+              <div className="space-y-2">
+                <Label>Existing Attachment</Label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDownload("attachment")}
+                    className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
+                  >
+                    <FileText className="h-4 w-4" />
+                    {problem.problemName}.zip
+                    <Download className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Attachments Upload - only if enabled */}
             {problem.attachments && (
-              <FileDropzone
-                label="Attachments"
-                accept=".zip"
-                description="ZIP archive"
-                files={attachmentFiles}
-                onFilesChange={setAttachmentFiles}
-              />
+              <div className="space-y-2">
+                <FileDropzone
+                  label="Upload New Attachment"
+                  accept=".zip"
+                  description="ZIP archive (will replace existing)"
+                  files={attachmentFiles}
+                  onFilesChange={setAttachmentFiles}
+                  onRawFilesChange={setAttachmentRawFiles}
+                />
+                {attachmentRawFiles.length > 0 && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleUploadFile("attachment", attachmentRawFiles, "attachment")}
+                    disabled={isUploading}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Attachment
+                  </Button>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -653,7 +1054,7 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
               <Button variant="outline" asChild>
                 <Link to={`/admin/problems/${problem.problemName}/testdata`} target="_blank">
                   <Upload className="mr-2 h-4 w-4" />
-                  Upload Testdata
+                  Manage Testdata
                 </Link>
               </Button>
             </div>

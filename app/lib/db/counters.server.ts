@@ -8,21 +8,7 @@ import {
   docClient,
   TableNames,
   UpdateCommand,
-  GetCommand,
 } from "./dynamodb-client.server";
-
-/**
- * Get the current value of a counter
- */
-export async function getCounter(counterId: string): Promise<number> {
-  const result = await docClient.send(
-    new GetCommand({
-      TableName: TableNames.globalCounters,
-      Key: { counterId },
-    })
-  );
-  return (result.Item?.value as number) || 0;
-}
 
 /**
  * Increment a counter and return the new value

@@ -43,9 +43,6 @@ export async function loader({}: Route.LoaderArgs) {
     name: u.fullname || u.username,
     email: u.email || "",
     role: u.role === "admin" ? "Admin" : "Contestant",
-    status: "active" as const, // All users are active by default
-    lastActive: new Date(),
-    createdAt: new Date(),
   }));
 
   return { users: userList };

@@ -1,12 +1,10 @@
 import * as React from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Pencil, Trash2, UserX, Filter, Plus } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { MoreHorizontal, Pencil, Trash2, Filter, Plus } from "lucide-react";
 
 import { DataTable } from "~/components/ui/data-table";
 import { DataTableColumnHeader } from "~/components/ui/data-table-column-header";
 import { UserAvatar } from "~/components/ui/user-avatar";
-import { StatusBadge } from "~/components/ui/status-badge";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -25,9 +23,6 @@ export interface User {
   email: string;
   avatar?: string;
   role: "Admin" | "Contestant";
-  status: "active" | "inactive";
-  lastActive: Date;
-  createdAt: Date;
 }
 
 const roleVariants: Record<string, "admin" | "contestant" | "outline"> = {
@@ -116,10 +111,6 @@ export const userColumns: ColumnDef<User>[] = [
             <DropdownMenuItem>
               <Pencil className="mr-2 h-4 w-4" />
               Edit user
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <UserX className="mr-2 h-4 w-4" />
-              {user.status === "active" ? "Deactivate" : "Activate"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive">

@@ -14,7 +14,6 @@ import {
   UpdateCommand,
   DeleteCommand,
   ScanCommand,
-  QueryCommand,
 } from "./dynamodb-client.server";
 
 /**
@@ -30,33 +29,6 @@ export async function listUsers(): Promise<User[]> {
 }
 
 /**
- * Get users by contest
- */
-export async function getUsersByContest(contestId: string): Promise<User[]> {
-  const result = await docClient.send(
-    new QueryCommand({
-      TableName: TableNames.users,
-      IndexName: "contestIndex",
-      KeyConditionExpression: "contestId = :contestId",
-      ExpressionAttributeValues: {
-        ":contestId": contestId,
-      },
-    })
-  );
-
-  // GSI is KEYS_ONLY, so we need to fetch full items
-  const usernames = (result.Items || []).map((item) => item.username as string);
-  const users: User[] = [];
-
-  for (const username of usernames) {
-    const user = await getUser(username);
-    if (user) users.push(user);
-  }
-
-  return users;
-}
-
-/**
  * Get a user by username
  */
 export async function getUser(username: string): Promise<User | null> {
@@ -67,14 +39,6 @@ export async function getUser(username: string): Promise<User | null> {
     })
   );
   return (result.Item as User) || null;
-}
-
-/**
- * Get users by role
- */
-export async function getUsersByRole(role: UserRole): Promise<User[]> {
-  const users = await listUsers();
-  return users.filter((u) => u.role === role);
 }
 
 /**
@@ -191,14 +155,6 @@ export async function deleteUser(username: string): Promise<boolean> {
     })
   );
   return true;
-}
-
-/**
- * Check if username exists
- */
-export async function userExists(username: string): Promise<boolean> {
-  const user = await getUser(username);
-  return user !== null;
 }
 
 /**

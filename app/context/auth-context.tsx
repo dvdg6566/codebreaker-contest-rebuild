@@ -42,18 +42,3 @@ export function useAuth(): AuthContextType {
 
   return context;
 }
-
-export function useUser(): User {
-  const { user } = useAuth();
-
-  if (!user) {
-    throw new Error("useUser must be used when user is authenticated");
-  }
-
-  return user;
-}
-
-export function useOptionalUser(): User | null {
-  const { user } = useAuth();
-  return user;
-}

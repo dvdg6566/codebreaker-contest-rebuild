@@ -3,6 +3,8 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "~/components/ui/s
 import { AppSidebar } from "~/components/layout/app-sidebar";
 import { Breadcrumbs } from "~/components/layout/breadcrumbs";
 import { Separator } from "~/components/ui/separator";
+import { NotificationBell } from "~/components/layout/notification-bell";
+import { NotificationToast } from "~/components/ui/notification-toast";
 
 interface AppLayoutProps {
   children?: React.ReactNode;
@@ -17,6 +19,9 @@ export function AppLayout({ children }: AppLayoutProps) {
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <Breadcrumbs />
+          <div className="ml-auto">
+            <NotificationBell />
+          </div>
         </header>
         <main className="flex-1 overflow-auto">
           <div className="flex flex-col gap-4 p-4 md:p-6">
@@ -24,6 +29,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </main>
       </SidebarInset>
+      <NotificationToast />
     </SidebarProvider>
   );
 }

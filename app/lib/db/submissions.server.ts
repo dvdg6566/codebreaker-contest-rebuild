@@ -121,14 +121,6 @@ export async function getSubmissionsByUserAndProblem(
 }
 
 /**
- * Get pending submissions (still being graded)
- */
-export async function getPendingSubmissions(): Promise<Submission[]> {
-  const submissions = await listSubmissions();
-  return submissions.filter((s) => s.status.some((st) => st === 1));
-}
-
-/**
  * Create a new submission
  */
 export async function createSubmission(

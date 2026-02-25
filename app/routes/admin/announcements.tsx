@@ -63,6 +63,7 @@ import {
   updateAnnouncement,
   deleteAnnouncement,
 } from "~/lib/db/announcements.server";
+import { broadcastAnnouncement } from "~/lib/websocket-broadcast.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -113,7 +114,16 @@ export async function action({ request }: Route.ActionArgs) {
       return data({ error: "Title and content are required" }, { status: 400 });
     }
 
-    await createAnnouncement(title, text, "admin", typeToPriority(type));
+    const priority = typeToPriority(type);
+    const announcement = await createAnnouncement(title, text, "admin", priority);
+
+    // Broadcast notification to all connected users
+    await broadcastAnnouncement(
+      announcement.announcementId,
+      title,
+      priority
+    );
+
     return { success: true };
   }
 
