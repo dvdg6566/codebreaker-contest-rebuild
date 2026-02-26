@@ -48,7 +48,7 @@ const VERDICT_CONFIG: Record<VerdictType, VerdictConfig> = {
   RF:      { label: "RF",  fullName: "Restricted Function" },
   IE:      { label: "IE",  fullName: "Internal Error" },
   pending: { label: "...", fullName: "Pending" },
-  judging: { label: "...", fullName: "Judging" },
+  judging: { label: "Grading", fullName: "Judging in progress" },
   none:    { label: "-",   fullName: "Not Attempted" },
   "N/A":   { label: "N/A", fullName: "Not Available" },
 };

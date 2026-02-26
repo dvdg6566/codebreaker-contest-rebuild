@@ -109,7 +109,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
       return {
         id: tcId,
-        verdict: isGraded ? submission.verdicts?.[tcIndex] || "N/A" : "...",
+        verdict: isGraded ? submission.verdicts?.[tcIndex] || "N/A" : "judging",
         score: isGraded ? submission.score?.[tcIndex] ?? 0 : "-",
         time: isGraded ? ((submission.times?.[tcIndex] ?? 0) / 1000).toFixed(2) : "N/A",
         memory: isGraded ? ((submission.memories?.[tcIndex] ?? 0) / 1000).toFixed(1) : "N/A",
@@ -118,8 +118,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
     // Determine subtask verdict
     const allAC = testcases.every((tc) => tc.verdict === "AC");
-    const hasNonAC = testcases.some((tc) => tc.verdict !== "AC" && tc.verdict !== "..." && tc.verdict !== "N/A");
-    const subtaskVerdict = allAC ? "AC" : hasNonAC ? testcases.find((tc) => tc.verdict !== "AC" && tc.verdict !== "..." && tc.verdict !== "N/A")?.verdict || "N/A" : "...";
+    const hasNonAC = testcases.some((tc) => tc.verdict !== "AC" && tc.verdict !== "judging" && tc.verdict !== "N/A");
+    const subtaskVerdict = allAC ? "AC" : hasNonAC ? testcases.find((tc) => tc.verdict !== "AC" && tc.verdict !== "judging" && tc.verdict !== "N/A")?.verdict || "N/A" : "judging";
 
     return {
       id: index + 1,

@@ -149,7 +149,7 @@ export async function createSubmission(
     memories: Array(count).fill(0),
     returnCodes: Array(count).fill(0),
     status: Array(count).fill(1),
-    subtaskScores: problem?.subtaskScores.map(() => 0) || [0],
+    subtaskScores: problem?.subtaskScores?.map(() => 0) || [0],
     totalScore: 0,
     maxTime: 0,
     maxMemory: 0,
@@ -353,7 +353,7 @@ export async function getBestSubmission(
   problemName: string
 ): Promise<Submission | null> {
   const submissions = await getSubmissionsByUserAndProblem(username, problemName);
-  const completed = submissions.filter((s) => s.status.every((st) => st === 2));
+  const completed = submissions.filter((s) => s.status?.every((st) => st === 2));
 
   if (completed.length === 0) return null;
 

@@ -70,7 +70,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   // Calculate stats
   const totalSubmissions = submissions.length;
-  const completedSubmissions = submissions.filter((s) => s.status.every((st) => st === 2));
+  const completedSubmissions = submissions.filter((s) => s.status?.every((st) => st === 2) ?? false);
   const acceptedSubmissions = completedSubmissions.filter((s) => s.totalScore === 100).length;
   const problemsSolved = Object.values(user.problemScores || {}).filter((score) => score === 100).length;
 
