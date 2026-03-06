@@ -13,6 +13,7 @@ import {
   Shield,
   Code2,
   LogOut,
+  FileCode,
 } from "lucide-react";
 import { useAuth } from "~/hooks/use-auth";
 import { useNotifications } from "~/context/websocket-context";
@@ -108,6 +109,11 @@ const adminNavItems = [
     title: "Clarifications",
     url: "/admin/clarifications",
     icon: MessageSquare,
+  },
+  {
+    title: "Submissions",
+    url: "/admin/submissions",
+    icon: FileCode,
   },
 ];
 

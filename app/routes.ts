@@ -69,6 +69,7 @@ export default [
       ),
       route("clarifications", "routes/admin/clarifications.tsx"),
       route("announcements", "routes/admin/announcements.tsx"),
+      route("submissions", "routes/admin/submissions.tsx"),
     ]),
   ]),
 ] satisfies RouteConfig;
