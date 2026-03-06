@@ -444,19 +444,6 @@ export async function canUserSubmit(
 }
 
 /**
- * Compute verdict for the submission list using only GSI-projected fields.
- * (gradingCompleteTime, verdicts, status are NOT projected by usernameIndex GSI)
- */
-function getListVerdict(submission: Submission, maxScore: number): SubmissionVerdict {
-  if (submission.compileErrorMessage) return "CE";
-  // maxTime/maxMemory are both 0 until the scorer Lambda writes them → still grading
-  if (submission.maxTime === 0 && submission.maxMemory === 0) return "pending";
-  if (submission.totalScore >= maxScore) return "AC";
-  if (submission.totalScore > 0) return "PS";
-  return "WA";
-}
-
-/**
  * Transform submission for display (with computed fields)
  */
 export async function formatSubmissionForDisplay(submission: Submission) {
@@ -479,13 +466,13 @@ export async function formatSubmissionForDisplay(submission: Submission) {
         : submission.language === "java"
         ? "Java"
         : submission.language,
-    verdict: getListVerdict(submission, maxScore),
+    verdict: getSubmissionVerdict(submission),
     score: submission.totalScore,
     maxScore,
-    time: submission.maxTime > 0 ? (submission.maxTime / 1000).toFixed(2) : "N/A",
-    memory: submission.maxMemory > 0 ? (submission.maxMemory / 1000).toFixed(1) : "N/A",
+    time: submission.gradingCompleteTime ? (submission.maxTime / 1000).toFixed(2) : "N/A",
+    memory: submission.gradingCompleteTime ? (submission.maxMemory / 1000).toFixed(1) : "N/A",
     submissionTime: submission.submissionTime,
-    isGrading: !submission.compileErrorMessage && submission.maxTime === 0 && submission.maxMemory === 0,
+    isGrading: !submission.gradingCompleteTime,
   };
 }
 
