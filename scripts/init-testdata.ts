@@ -20,6 +20,8 @@ import {
   DynamoDBClient,
   PutItemCommand,
   UpdateItemCommand,
+  GetItemCommand,
+  ScanCommand,
 } from "@aws-sdk/client-dynamodb";
 import { marshall } from "@aws-sdk/util-dynamodb";
 
@@ -340,15 +342,52 @@ async function main(): Promise<void> {
     }
 
     console.log("\n=== Test Data Initialization Complete ===");
-    console.log("\nScoreboard should show:");
-    console.log("  1. charlie: 256 points (addition=100, ping=100, prisoners=56)");
-    console.log("  2. alice: 167 points (addition=100, ping=40, prisoners=27)");
-    console.log("  3. bob: 46 points (addition=36, ping=10)");
-    console.log("  4. diana: 0 points (no submissions)");
-    console.log("\nNote: Alice's 'addition' score of 100 demonstrates IOI-style scoring:");
-    console.log("  - Submission 1: subtasks [0, 36, 0] = 36 points");
-    console.log("  - Submission 2: subtasks [0, 0, 64] = 64 points");
-    console.log("  - Best per subtask: [0, 36, 64] = 100 total");
+
+    // Validation
+    console.log("\n--- Validating ---");
+    let passed = 0;
+    let failed = 0;
+
+    async function check(label: string, fn: () => Promise<boolean>) {
+      const ok = await fn();
+      console.log(`  ${ok ? "✓" : "✗"} ${label}`);
+      ok ? passed++ : failed++;
+    }
+
+    // Check each user exists
+    for (const user of USERS) {
+      await check(`User '${user.username}' in DynamoDB`, async () => {
+        const res = await dynamodb.send(new GetItemCommand({
+          TableName: TABLES.users,
+          Key: { username: { S: user.username } },
+        }));
+        return !!res.Item;
+      });
+    }
+
+    // Check contest exists
+    await check(`Contest '${CONTEST.contestId}' in DynamoDB`, async () => {
+      const res = await dynamodb.send(new GetItemCommand({
+        TableName: TABLES.contests,
+        Key: { contestId: { S: CONTEST.contestId } },
+      }));
+      return !!res.Item;
+    });
+
+    // Check submission count
+    await check(`${SUBMISSIONS.length} submissions in DynamoDB`, async () => {
+      const res = await dynamodb.send(new ScanCommand({
+        TableName: TABLES.submissions,
+        Select: "COUNT",
+      }));
+      return (res.Count ?? 0) >= SUBMISSIONS.length;
+    });
+
+    console.log(`\n  ${passed}/${passed + failed} checks passed`);
+    if (failed > 0) {
+      console.error(`  ${failed} check(s) failed — data may not have been written correctly`);
+      process.exit(1);
+    }
   } catch (error) {
     console.error("Error during initialization:", error);
     process.exit(1);

@@ -24,6 +24,7 @@ import {
   PutItemCommand,
   UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
+import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { marshall } from "@aws-sdk/util-dynamodb";
 
 // Configuration
@@ -33,6 +34,7 @@ const REGION = process.env.AWS_REGION || "ap-southeast-1";
 // AWS Clients
 const s3 = new S3Client({ region: REGION });
 const dynamodb = new DynamoDBClient({ region: REGION });
+const lambda = new LambdaClient({ region: REGION });
 
 // Bucket names
 const BUCKETS = {
@@ -223,6 +225,7 @@ async function createPing(): Promise<void> {
     checker,
     "text/x-c++src"
   );
+  await compileChecker(problemName);
 
   // Upload grader
   console.log("Uploading grader...");
@@ -268,7 +271,6 @@ async function createPing(): Promise<void> {
   });
 
   console.log("Problem 'ping' created successfully!");
-  console.log("Note: Checker needs to be compiled on the Lambda compiler.");
 }
 
 // ============================================================================
@@ -313,6 +315,7 @@ async function createPrisoners(): Promise<void> {
     checker,
     "text/x-c++src"
   );
+  await compileChecker(problemName);
 
   // Upload grader
   console.log("Uploading grader...");
@@ -368,7 +371,57 @@ async function createPrisoners(): Promise<void> {
   });
 
   console.log("Problem 'prisoners' created successfully!");
-  console.log("Note: Checker needs to be compiled on the Lambda compiler.");
+}
+
+// Helper: Compile checker via Lambda
+async function compileChecker(problemName: string): Promise<void> {
+  const compilerArn = `arn:aws:lambda:${REGION}:${process.env.AWS_ACCOUNT_ID}:function:${JUDGE_NAME}-compiler`;
+  console.log("  Compiling checker...");
+
+  const response = await lambda.send(
+    new InvokeCommand({
+      FunctionName: compilerArn,
+      InvocationType: "RequestResponse",
+      Payload: JSON.stringify({ problemName, eventType: "CHECKER" }),
+    })
+  );
+
+  const result = JSON.parse(new TextDecoder().decode(response.Payload));
+  if (result.status === 200) {
+    console.log("  Checker compiled successfully!");
+  } else {
+    throw new Error(`Checker compilation failed: ${result.error || "Unknown error"}`);
+  }
+}
+
+// ============================================================================
+// Validate problem via Lambda
+// ============================================================================
+async function validateProblem(problemName: string): Promise<void> {
+  const functionArn = `arn:aws:lambda:${REGION}:${process.env.AWS_ACCOUNT_ID}:function:${JUDGE_NAME}-problem-validation`;
+
+  console.log(`\nValidating problem '${problemName}'...`);
+
+  const response = await lambda.send(
+    new InvokeCommand({
+      FunctionName: functionArn,
+      InvocationType: "RequestResponse",
+      Payload: JSON.stringify({ problemName }),
+    })
+  );
+
+  const result = JSON.parse(new TextDecoder().decode(response.Payload));
+  const verdicts: Record<string, number> = result.verdicts ?? {};
+  const remarks: Record<string, string> = result.remarks ?? {};
+
+  for (const [key, verdict] of Object.entries(verdicts)) {
+    const icon = verdict === 1 ? "✓" : "✗";
+    const remark = remarks[key] ? ` — ${remarks[key]}` : "";
+    console.log(`  ${icon} ${key}${remark}`);
+  }
+
+  const validated = Object.values(verdicts).every((v) => v === 1);
+  console.log(`  ${validated ? "Problem validated!" : "Validation failed."}`);
 }
 
 // ============================================================================
@@ -394,12 +447,15 @@ async function main(): Promise<void> {
     await createPing();
     await createPrisoners();
 
+    console.log("\n=== Validating Problems ===");
+    await validateProblem("addition");
+    await validateProblem("ping");
+    await validateProblem("prisoners");
+
     console.log("\n=== Initialization Complete ===");
     console.log("\nNext steps:");
     console.log("1. Run 'bun run init:users' to create Cognito users (if not already done)");
     console.log("2. Run 'bun run init:testdata' to create test contest data");
-    console.log("3. Compile checkers for 'ping' and 'prisoners' problems");
-    console.log("4. Verify problems are validated in the admin panel");
   } catch (error) {
     console.error("Error during initialization:", error);
     process.exit(1);

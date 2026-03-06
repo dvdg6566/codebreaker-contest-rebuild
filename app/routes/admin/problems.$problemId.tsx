@@ -316,6 +316,27 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
   } | null>(null);
   const [isUploading, setIsUploading] = React.useState(false);
 
+  // Hidden file input refs for inline replace/upload buttons
+  const replaceStatementRef = React.useRef<HTMLInputElement>(null);
+  const replaceCheckerRef = React.useRef<HTMLInputElement>(null);
+  const replaceGraderCppRef = React.useRef<HTMLInputElement>(null);
+  const replaceHeaderRef = React.useRef<HTMLInputElement>(null);
+  const replaceHeaderARef = React.useRef<HTMLInputElement>(null);
+  const replaceHeaderBRef = React.useRef<HTMLInputElement>(null);
+  const replaceAttachmentRef = React.useRef<HTMLInputElement>(null);
+
+  // Auto-upload when a file is picked via a replace button
+  const handleReplaceFile = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: "statement" | "checker" | "grader" | "header" | "attachment",
+    extraParams?: { filename?: string }
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ""; // reset so same file can be re-selected
+    await handleUploadFile(type, [file], type, extraParams);
+  };
+
   // Download file handler - fetches presigned URL on demand
   const handleDownload = async (type: string, name?: string) => {
     try {
@@ -792,16 +813,33 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
                 <Label>Existing Statements</Label>
                 <div className="flex flex-wrap gap-2">
                   {existingFiles.statements.map((file) => (
-                    <button
-                      key={file.name}
-                      type="button"
-                      onClick={() => handleDownload("statement", file.name)}
-                      className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
-                    >
-                      <FileText className="h-4 w-4" />
-                      {file.name}
-                      <Download className="h-3 w-3 text-muted-foreground" />
-                    </button>
+                    <div key={file.name} className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDownload("statement", file.name)}
+                        className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
+                      >
+                        <FileText className="h-4 w-4" />
+                        {file.name}
+                        <Download className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                      <input
+                        ref={replaceStatementRef}
+                        type="file"
+                        accept=".html,.pdf"
+                        className="hidden"
+                        onChange={(e) => handleReplaceFile(e, "statement")}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => replaceStatementRef.current?.click()}
+                        disabled={isUploading}
+                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50"
+                      >
+                        <Upload className="h-3 w-3" />
+                        Replace
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -845,6 +883,22 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
                     {problem.problemName}.cpp
                     <Download className="h-3 w-3 text-muted-foreground" />
                   </button>
+                  <input
+                    ref={replaceCheckerRef}
+                    type="file"
+                    accept=".cpp"
+                    className="hidden"
+                    onChange={(e) => handleReplaceFile(e, "checker")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => replaceCheckerRef.current?.click()}
+                    disabled={isUploading}
+                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50"
+                  >
+                    <Upload className="h-3 w-3" />
+                    Replace & Compile
+                  </button>
                   <Badge variant={existingFiles.checker.compiled ? "success" : "secondary"}>
                     {existingFiles.checker.compiled ? "Compiled" : "Not Compiled"}
                   </Badge>
@@ -885,16 +939,37 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
                 <Label>Existing Grader Files</Label>
                 <div className="flex flex-wrap gap-2">
                   {existingFiles.graders.map((fileName) => (
-                    <button
-                      key={fileName}
-                      type="button"
-                      onClick={() => handleDownload("grader", fileName)}
-                      className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
-                    >
-                      <FileText className="h-4 w-4" />
-                      {fileName}
-                      <Download className="h-3 w-3 text-muted-foreground" />
-                    </button>
+                    <div key={fileName} className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDownload("grader", fileName)}
+                        className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
+                      >
+                        <FileText className="h-4 w-4" />
+                        {fileName}
+                        <Download className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                      <input
+                        ref={replaceGraderRef}
+                        type="file"
+                        accept={fileName.endsWith(".h") ? ".h" : ".cpp"}
+                        className="hidden"
+                        onChange={(e) => handleReplaceFile(
+                          e,
+                          fileName.endsWith(".h") ? "header" : "grader",
+                          fileName.endsWith(".h") ? { filename: fileName } : undefined
+                        )}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => replaceGraderRef.current?.click()}
+                        disabled={isUploading}
+                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50"
+                      >
+                        <Upload className="h-3 w-3" />
+                        Replace
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1012,6 +1087,22 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
                     <FileText className="h-4 w-4" />
                     {problem.problemName}.zip
                     <Download className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                  <input
+                    ref={replaceAttachmentRef}
+                    type="file"
+                    accept=".zip"
+                    className="hidden"
+                    onChange={(e) => handleReplaceFile(e, "attachment")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => replaceAttachmentRef.current?.click()}
+                    disabled={isUploading}
+                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50"
+                  >
+                    <Upload className="h-3 w-3" />
+                    Replace
                   </button>
                 </div>
               </div>
