@@ -263,7 +263,7 @@ export function getSubmissionVerdict(submission: Submission): SubmissionVerdict 
   }
 
   // Check if still grading
-  if (submission.status.some(s => s === 1)) {
+  if (submission.status.slice(1).some(s => s === 1)) {
     return "pending";
   }
 
@@ -273,12 +273,12 @@ export function getSubmissionVerdict(submission: Submission): SubmissionVerdict 
   }
 
   // Check verdicts - if all AC, return AC
-  if (submission.verdicts.every(v => v === "AC")) {
+  if (submission.verdicts.slice(1).every(v => v === "AC")) {
     return "AC";
   }
 
   // Return first non-AC verdict
-  const nonAc = submission.verdicts.find(v => v !== "AC" && v !== ":(");
+  const nonAc = submission.verdicts.slice(1).find(v => v !== "AC" && v !== ":(");
   if (nonAc === "TLE") return "TLE";
   if (nonAc === "MLE") return "MLE";
   if (nonAc === "RTE" || nonAc === "RE") return "RTE";

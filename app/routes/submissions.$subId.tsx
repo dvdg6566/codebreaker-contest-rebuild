@@ -1,5 +1,6 @@
 import type { Route } from "./+types/submissions.$subId";
-import { Link } from "react-router";
+import { Link, useRevalidator } from "react-router";
+import { useEffect } from "react";
 import {
   ChevronLeft,
   Clock,
@@ -103,7 +104,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
     // Build testcases for this subtask
     const testcases = testcaseIds.map((tcId) => {
-      const tcIndex = tcId - 1; // 0-indexed
+      const tcIndex = tcId; // grader is 1-indexed
       const status = submission.status?.[tcIndex] ?? 1;
       const isGraded = status === 2;
 
@@ -166,7 +167,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       codeA,
       codeB,
       subtasks,
-      isGrading: submission.status?.some((s) => s === 1) ?? true,
+      isGrading: submission.status?.slice(1).some((s) => s === 1) ?? true,
     },
   };
 }
@@ -192,6 +193,13 @@ const verdictIcon = (verdict: string) => {
 
 export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
   const { submissionData } = loaderData;
+  const revalidator = useRevalidator();
+
+  useEffect(() => {
+    if (!submissionData.isGrading) return;
+    const interval = setInterval(() => revalidator.revalidate(), 1000);
+    return () => clearInterval(interval);
+  }, [submissionData.isGrading]);
 
   return (
     <div className="space-y-6">

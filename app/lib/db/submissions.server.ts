@@ -143,12 +143,12 @@ export async function createSubmission(
     submissionTime: now,
     gradingTime: now,
     gradingCompleteTime: "",
-    score: Array(count).fill(0),
-    verdicts: Array(count).fill(":("),
-    times: Array(count).fill(0),
-    memories: Array(count).fill(0),
-    returnCodes: Array(count).fill(0),
-    status: Array(count).fill(1),
+    score: Array(count + 1).fill(0),
+    verdicts: Array(count + 1).fill(":("),
+    times: Array(count + 1).fill(0),
+    memories: Array(count + 1).fill(0),
+    returnCodes: Array(count + 1).fill(0),
+    status: Array(count + 1).fill(1),
     subtaskScores: problem?.subtaskScores?.map(() => 0) || [0],
     totalScore: 0,
     maxTime: 0,
@@ -353,7 +353,7 @@ export async function getBestSubmission(
   problemName: string
 ): Promise<Submission | null> {
   const submissions = await getSubmissionsByUserAndProblem(username, problemName);
-  const completed = submissions.filter((s) => s.status?.every((st) => st === 2));
+  const completed = submissions.filter((s) => s.status?.slice(1).every((st) => st === 2));
 
   if (completed.length === 0) return null;
 
@@ -478,7 +478,7 @@ export async function formatSubmissionForDisplay(submission: Submission) {
         ? (submission.maxMemory / 1000).toFixed(1)
         : "N/A",
     submissionTime: submission.submissionTime,
-    isGrading: submission.status?.some((s) => s === 1) ?? true,
+    isGrading: submission.status?.slice(1).some((s) => s === 1) ?? true,
   };
 }
 

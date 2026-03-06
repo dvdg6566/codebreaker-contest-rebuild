@@ -57,14 +57,8 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { SortableSubtaskItem } from "~/components/admin/sortable-subtask-item";
-import { FileDropzone } from "~/components/ui/file-dropzone";
 import type { Problem, ProblemType } from "~/types/problem";
 
-interface UploadedFile {
-  name: string;
-  type: string;
-  size: number;
-}
 
 interface Subtask {
   id: string;
@@ -289,23 +283,6 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
     })
   );
 
-  // File upload state (metadata for display)
-  const [statementFiles, setStatementFiles] = React.useState<UploadedFile[]>([]);
-  const [checkerFiles, setCheckerFiles] = React.useState<UploadedFile[]>([]);
-  const [graderFiles, setGraderFiles] = React.useState<UploadedFile[]>([]);
-  const [headerFiles, setHeaderFiles] = React.useState<UploadedFile[]>([]);
-  const [headerAFiles, setHeaderAFiles] = React.useState<UploadedFile[]>([]);
-  const [headerBFiles, setHeaderBFiles] = React.useState<UploadedFile[]>([]);
-  const [attachmentFiles, setAttachmentFiles] = React.useState<UploadedFile[]>([]);
-
-  // Raw File objects for upload
-  const [statementRawFiles, setStatementRawFiles] = React.useState<File[]>([]);
-  const [checkerRawFiles, setCheckerRawFiles] = React.useState<File[]>([]);
-  const [graderRawFiles, setGraderRawFiles] = React.useState<File[]>([]);
-  const [headerRawFiles, setHeaderRawFiles] = React.useState<File[]>([]);
-  const [headerARawFiles, setHeaderARawFiles] = React.useState<File[]>([]);
-  const [headerBRawFiles, setHeaderBRawFiles] = React.useState<File[]>([]);
-  const [attachmentRawFiles, setAttachmentRawFiles] = React.useState<File[]>([]);
 
   // Upload status state
   const [uploadStatus, setUploadStatus] = React.useState<{
@@ -358,39 +335,6 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
     }
   };
 
-  // Clear file state after successful upload
-  const clearFileState = (type: string) => {
-    switch (type) {
-      case "statement":
-        setStatementFiles([]);
-        setStatementRawFiles([]);
-        break;
-      case "checker":
-        setCheckerFiles([]);
-        setCheckerRawFiles([]);
-        break;
-      case "grader":
-        setGraderFiles([]);
-        setGraderRawFiles([]);
-        break;
-      case "header":
-        setHeaderFiles([]);
-        setHeaderRawFiles([]);
-        break;
-      case "headerA":
-        setHeaderAFiles([]);
-        setHeaderARawFiles([]);
-        break;
-      case "headerB":
-        setHeaderBFiles([]);
-        setHeaderBRawFiles([]);
-        break;
-      case "attachment":
-        setAttachmentFiles([]);
-        setAttachmentRawFiles([]);
-        break;
-    }
-  };
 
   // Upload file handler
   const handleUploadFile = async (
@@ -456,7 +400,6 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
       }
 
       // Clear file selection and refresh data
-      clearFileState(stateType);
       revalidator.revalidate();
     } catch (error) {
       setUploadStatus({
@@ -845,287 +788,153 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
               </div>
             )}
 
-            {/* Statement Upload */}
-            <div className="space-y-2">
-              <FileDropzone
-                label="Upload New Statement"
-                accept=".html,.pdf"
-                description="HTML or PDF format (will replace existing)"
-                files={statementFiles}
-                onFilesChange={setStatementFiles}
-                onRawFilesChange={setStatementRawFiles}
-                multiple
-              />
-              {statementRawFiles.length > 0 && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleUploadFile("statement", statementRawFiles, "statement")}
-                  disabled={isUploading}
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Statement
-                </Button>
-              )}
-            </div>
-
-            {/* Existing Checker */}
-            {problem.customChecker && existingFiles.checker.source && (
+            {/* Statement — upload button when none exist */}
+            {existingFiles.statements.length === 0 && (
               <div className="space-y-2">
-                <Label>Existing Checker</Label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDownload("checker")}
-                    className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
-                  >
-                    <FileText className="h-4 w-4" />
-                    {problem.problemName}.cpp
-                    <Download className="h-3 w-3 text-muted-foreground" />
-                  </button>
-                  <input
-                    ref={replaceCheckerRef}
-                    type="file"
-                    accept=".cpp"
-                    className="hidden"
-                    onChange={(e) => handleReplaceFile(e, "checker")}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => replaceCheckerRef.current?.click()}
-                    disabled={isUploading}
-                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50"
-                  >
-                    <Upload className="h-3 w-3" />
-                    Replace & Compile
-                  </button>
-                  <Badge variant={existingFiles.checker.compiled ? "success" : "secondary"}>
-                    {existingFiles.checker.compiled ? "Compiled" : "Not Compiled"}
-                  </Badge>
+                <Label>Statement</Label>
+                <div>
+                  <input ref={replaceStatementRef} type="file" accept=".html,.pdf" className="hidden" onChange={(e) => handleReplaceFile(e, "statement")} />
+                  <Button variant="outline" size="sm" onClick={() => replaceStatementRef.current?.click()} disabled={isUploading}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Statement
+                  </Button>
                 </div>
               </div>
             )}
 
-            {/* Checker Upload - only if custom checker enabled */}
+            {/* Checker */}
             {problem.customChecker && (
               <div className="space-y-2">
-                <FileDropzone
-                  label="Upload New Checker"
-                  accept=".cpp"
-                  description="C++ source file (will replace existing and auto-compile)"
-                  files={checkerFiles}
-                  onFilesChange={setCheckerFiles}
-                  onRawFilesChange={setCheckerRawFiles}
-                />
-                {checkerRawFiles.length > 0 && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handleUploadFile("checker", checkerRawFiles, "checker")}
-                    disabled={isUploading}
-                  >
+                <Label>Checker</Label>
+                <div>
+                <input ref={replaceCheckerRef} type="file" accept=".cpp" className="hidden" onChange={(e) => handleReplaceFile(e, "checker")} />
+                {existingFiles.checker.source ? (
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => handleDownload("checker")} className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer">
+                      <FileText className="h-4 w-4" />
+                      {problem.problemName}.cpp
+                      <Download className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                    <button type="button" onClick={() => replaceCheckerRef.current?.click()} disabled={isUploading} className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50">
+                      <Upload className="h-3 w-3" />
+                      Replace & Compile
+                    </button>
+                    <Badge variant={existingFiles.checker.compiled ? "success" : "secondary"}>
+                      {existingFiles.checker.compiled ? "Compiled" : "Not Compiled"}
+                    </Badge>
+                  </div>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => replaceCheckerRef.current?.click()} disabled={isUploading}>
                     <Upload className="mr-2 h-4 w-4" />
                     Upload & Compile Checker
                   </Button>
                 )}
-              </div>
-            )}
-
-            {/* Existing Graders */}
-            {(problem.problem_type === "Interactive" ||
-              problem.problem_type === "Communication") &&
-              existingFiles.graders.length > 0 && (
-              <div className="space-y-2">
-                <Label>Existing Grader Files</Label>
-                <div className="flex flex-wrap gap-2">
-                  {existingFiles.graders.map((fileName) => (
-                    <div key={fileName} className="inline-flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => handleDownload("grader", fileName)}
-                        className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
-                      >
-                        <FileText className="h-4 w-4" />
-                        {fileName}
-                        <Download className="h-3 w-3 text-muted-foreground" />
-                      </button>
-                      <input
-                        ref={replaceGraderRef}
-                        type="file"
-                        accept={fileName.endsWith(".h") ? ".h" : ".cpp"}
-                        className="hidden"
-                        onChange={(e) => handleReplaceFile(
-                          e,
-                          fileName.endsWith(".h") ? "header" : "grader",
-                          fileName.endsWith(".h") ? { filename: fileName } : undefined
-                        )}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => replaceGraderRef.current?.click()}
-                        disabled={isUploading}
-                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50"
-                      >
-                        <Upload className="h-3 w-3" />
-                        Replace
-                      </button>
-                    </div>
-                  ))}
                 </div>
               </div>
             )}
 
-            {/* Grader Upload - for Interactive/Communication */}
-            {(problem.problem_type === "Interactive" ||
-              problem.problem_type === "Communication") && (
-              <>
-                <div className="space-y-2">
-                  <FileDropzone
-                    label="Upload New Grader"
-                    accept=".cpp"
-                    description="C++ source file"
-                    files={graderFiles}
-                    onFilesChange={setGraderFiles}
-                    onRawFilesChange={setGraderRawFiles}
-                  />
-                  {graderRawFiles.length > 0 && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleUploadFile("grader", graderRawFiles, "grader")}
-                      disabled={isUploading}
-                    >
-                      <Upload className="mr-2 h-4 w-4" />
-                      Upload Grader
+            {/* Grader files */}
+            {(problem.problem_type === "Interactive" || problem.problem_type === "Communication") && (
+              <div>
+                <input ref={replaceGraderCppRef} type="file" accept=".cpp" className="hidden" onChange={(e) => handleReplaceFile(e, "grader")} />
+                <input ref={replaceHeaderRef} type="file" accept=".h" className="hidden" onChange={(e) => handleReplaceFile(e, "header", { filename: `${problem.problemName}.h` })} />
+                <input ref={replaceHeaderARef} type="file" accept=".h" className="hidden" onChange={(e) => handleReplaceFile(e, "header", { filename: `${problem.nameA || "fileA"}.h` })} />
+                <input ref={replaceHeaderBRef} type="file" accept=".h" className="hidden" onChange={(e) => handleReplaceFile(e, "header", { filename: `${problem.nameB || "fileB"}.h` })} />
+                <div className="flex flex-col gap-2">
+                <Label>Grader Files</Label>
+                  {/* grader.cpp */}
+                  {existingFiles.graders.includes("grader.cpp") ? (
+                    <div className="inline-flex items-center gap-1">
+                      <button type="button" onClick={() => handleDownload("grader", "grader.cpp")} className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer">
+                        <FileText className="h-4 w-4" />grader.cpp<Download className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                      <button type="button" onClick={() => replaceGraderCppRef.current?.click()} disabled={isUploading} className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50">
+                        <Upload className="h-3 w-3" />Replace
+                      </button>
+                    </div>
+                  ) : (
+                    <Button variant="outline" size="sm" className="w-auto" onClick={() => replaceGraderCppRef.current?.click()} disabled={isUploading}>
+                      <Upload className="mr-2 h-4 w-4" />Upload grader.cpp
                     </Button>
                   )}
-                </div>
-
-                {problem.problem_type === "Interactive" && (
-                  <div className="space-y-2">
-                    <FileDropzone
-                      label="Header File"
-                      accept=".h"
-                      description="C/C++ header file"
-                      files={headerFiles}
-                      onFilesChange={setHeaderFiles}
-                      onRawFilesChange={setHeaderRawFiles}
-                    />
-                    {headerRawFiles.length > 0 && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleUploadFile("header", headerRawFiles, "header", { filename: `${problem.problemName}.h` })}
-                        disabled={isUploading}
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        Upload Header
+                  {/* Interactive header */}
+                  {problem.problem_type === "Interactive" && (() => {
+                    const headerName = `${problem.problemName}.h`;
+                    return existingFiles.graders.includes(headerName) ? (
+                      <div className="inline-flex items-center gap-1">
+                        <button type="button" onClick={() => handleDownload("grader", headerName)} className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer">
+                          <FileText className="h-4 w-4" />{headerName}<Download className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                        <button type="button" onClick={() => replaceHeaderRef.current?.click()} disabled={isUploading} className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50">
+                          <Upload className="h-3 w-3" />Replace
+                        </button>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" className="w-auto" onClick={() => replaceHeaderRef.current?.click()} disabled={isUploading}>
+                        <Upload className="mr-2 h-4 w-4" />Upload {headerName}
                       </Button>
-                    )}
-                  </div>
-                )}
-
-                {problem.problem_type === "Communication" && (
-                  <>
-                    <div className="space-y-2">
-                      <FileDropzone
-                        label={`${problem.nameA || "FileA"} Header`}
-                        accept=".h"
-                        description="C/C++ header file"
-                        files={headerAFiles}
-                        onFilesChange={setHeaderAFiles}
-                        onRawFilesChange={setHeaderARawFiles}
-                      />
-                      {headerARawFiles.length > 0 && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleUploadFile("header", headerARawFiles, "headerA", { filename: `${problem.nameA || "fileA"}.h` })}
-                          disabled={isUploading}
-                        >
-                          <Upload className="mr-2 h-4 w-4" />
-                          Upload {problem.nameA || "FileA"} Header
-                        </Button>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <FileDropzone
-                        label={`${problem.nameB || "FileB"} Header`}
-                        accept=".h"
-                        description="C/C++ header file"
-                        files={headerBFiles}
-                        onFilesChange={setHeaderBFiles}
-                        onRawFilesChange={setHeaderBRawFiles}
-                      />
-                      {headerBRawFiles.length > 0 && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleUploadFile("header", headerBRawFiles, "headerB", { filename: `${problem.nameB || "fileB"}.h` })}
-                          disabled={isUploading}
-                        >
-                          <Upload className="mr-2 h-4 w-4" />
-                          Upload {problem.nameB || "FileB"} Header
-                        </Button>
-                      )}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-
-            {/* Existing Attachment */}
-            {problem.attachments && existingFiles.attachment.exists && (
-              <div className="space-y-2">
-                <Label>Existing Attachment</Label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDownload("attachment")}
-                    className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
-                  >
-                    <FileText className="h-4 w-4" />
-                    {problem.problemName}.zip
-                    <Download className="h-3 w-3 text-muted-foreground" />
-                  </button>
-                  <input
-                    ref={replaceAttachmentRef}
-                    type="file"
-                    accept=".zip"
-                    className="hidden"
-                    onChange={(e) => handleReplaceFile(e, "attachment")}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => replaceAttachmentRef.current?.click()}
-                    disabled={isUploading}
-                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50"
-                  >
-                    <Upload className="h-3 w-3" />
-                    Replace
-                  </button>
+                    );
+                  })()}
+                  {/* Communication headers */}
+                  {problem.problem_type === "Communication" && (() => {
+                    const headerA = `${problem.nameA || "fileA"}.h`;
+                    const headerB = `${problem.nameB || "fileB"}.h`;
+                    return (
+                      <>
+                        {existingFiles.graders.includes(headerA) ? (
+                          <div className="inline-flex items-center gap-1">
+                            <button type="button" onClick={() => handleDownload("grader", headerA)} className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer">
+                              <FileText className="h-4 w-4" />{headerA}<Download className="h-3 w-3 text-muted-foreground" />
+                            </button>
+                            <button type="button" onClick={() => replaceHeaderARef.current?.click()} disabled={isUploading} className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50">
+                              <Upload className="h-3 w-3" />Replace
+                            </button>
+                          </div>
+                        ) : (
+                          <Button variant="outline" size="sm" className="w-auto" onClick={() => replaceHeaderARef.current?.click()} disabled={isUploading}>
+                            <Upload className="mr-2 h-4 w-4" />Upload {headerA}
+                          </Button>
+                        )}
+                        {existingFiles.graders.includes(headerB) ? (
+                          <div className="inline-flex items-center gap-1">
+                            <button type="button" onClick={() => handleDownload("grader", headerB)} className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer">
+                              <FileText className="h-4 w-4" />{headerB}<Download className="h-3 w-3 text-muted-foreground" />
+                            </button>
+                            <button type="button" onClick={() => replaceHeaderBRef.current?.click()} disabled={isUploading} className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50">
+                              <Upload className="h-3 w-3" />Replace
+                            </button>
+                          </div>
+                        ) : (
+                          <Button variant="outline" size="sm" onClick={() => replaceHeaderBRef.current?.click()} disabled={isUploading}>
+                            <Upload className="mr-2 h-4 w-4" />Upload {headerB}
+                          </Button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}
 
-            {/* Attachments Upload - only if enabled */}
+            {/* Attachment */}
             {problem.attachments && (
               <div className="space-y-2">
-                <FileDropzone
-                  label="Upload New Attachment"
-                  accept=".zip"
-                  description="ZIP archive (will replace existing)"
-                  files={attachmentFiles}
-                  onFilesChange={setAttachmentFiles}
-                  onRawFilesChange={setAttachmentRawFiles}
-                />
-                {attachmentRawFiles.length > 0 && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handleUploadFile("attachment", attachmentRawFiles, "attachment")}
-                    disabled={isUploading}
-                  >
+                <Label>Attachment</Label>
+                <input ref={replaceAttachmentRef} type="file" accept=".zip" className="hidden" onChange={(e) => handleReplaceFile(e, "attachment")} />
+                {existingFiles.attachment.exists ? (
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => handleDownload("attachment")} className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer">
+                      <FileText className="h-4 w-4" />
+                      {problem.problemName}.zip
+                      <Download className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                    <button type="button" onClick={() => replaceAttachmentRef.current?.click()} disabled={isUploading} className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50">
+                      <Upload className="h-3 w-3" />
+                      Replace
+                    </button>
+                  </div>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => replaceAttachmentRef.current?.click()} disabled={isUploading}>
                     <Upload className="mr-2 h-4 w-4" />
                     Upload Attachment
                   </Button>

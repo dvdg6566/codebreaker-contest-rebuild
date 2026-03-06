@@ -266,7 +266,7 @@ export async function checkGradingStatus(
   }
 
   // Check if all testcases are graded
-  const allGraded = submission.status?.every((s) => s === 2) ?? false;
+  const allGraded = submission.status?.slice(1).every((s) => s === 2) ?? false;
   if (allGraded) {
     return { status: "SUCCEEDED" };
   }
