@@ -31,13 +31,14 @@ export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
+  const rememberMe = formData.get("remember") === "on";
 
   if (!username || !password) {
     return { error: "Username and password are required" };
   }
 
   try {
-    const { cookie } = await login(username, password);
+    const { cookie } = await login(username, password, rememberMe);
 
     return redirect("/", {
       headers: {

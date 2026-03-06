@@ -14,7 +14,8 @@ export type { SessionData, UserRole };
  */
 export async function login(
   username: string,
-  password: string
+  password: string,
+  rememberMe = false
 ): Promise<{ session: SessionData; cookie: string }> {
   // Authenticate with auth service (mock or Cognito)
   const authResult = await authenticate(username, password);
@@ -30,7 +31,7 @@ export async function login(
     userId: tokenInfo.username,
     username: tokenInfo.username,
     role,
-    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days (matches cookie maxAge)
+    expiresAt: Date.now() + (rememberMe ? 7 * 24 * 60 * 60 * 1000 : 6 * 60 * 60 * 1000), // 7 days or 6 hours
   };
 
   // Create session cookie
