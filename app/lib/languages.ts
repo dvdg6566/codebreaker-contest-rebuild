@@ -33,32 +33,6 @@ export const LANGUAGES = {
 export type LanguageId = keyof typeof LANGUAGES;
 
 /**
- * Map from short code to full language config
- */
-export const languageConfig = LANGUAGES;
-
-/**
- * Get all available languages
- */
-export function getLanguages() {
-  return Object.values(LANGUAGES);
-}
-
-/**
- * Get language by ID
- */
-export function getLanguage(id: string) {
-  return LANGUAGES[id as LanguageId] || null;
-}
-
-/**
- * Get display name for a language
- */
-export function getLanguageName(id: string): string {
-  return LANGUAGES[id as LanguageId]?.name || id;
-}
-
-/**
  * Get file extension for a language
  */
 export function getLanguageExtension(id: string): string {

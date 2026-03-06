@@ -30,7 +30,7 @@ export async function login(
     userId: tokenInfo.username,
     username: tokenInfo.username,
     role,
-    expiresAt: Date.now() + authResult.expiresIn * 1000,
+    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days (matches cookie maxAge)
   };
 
   // Create session cookie

@@ -1,4 +1,4 @@
-import { useNavigate, data, redirect, Form } from "react-router";
+import { data, redirect, Form } from "react-router";
 import type { Route } from "./+types/problems";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { ProblemManagementTable } from "~/components/admin/problem-management-table";
@@ -52,8 +52,6 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function AdminProblemsPage({ loaderData }: Route.ComponentProps) {
   const { problems } = loaderData;
-  const navigate = useNavigate();
-
   const handleAddProblem = (problemId: string) => {
     // Submit via form action to create problem in database
     const form = document.createElement("form");

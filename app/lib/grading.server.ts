@@ -265,18 +265,13 @@ export async function checkGradingStatus(
     return { status: "UNKNOWN" };
   }
 
-  // Check if all testcases are graded
-  const allGraded = submission.status?.slice(1).every((s) => s === 2) ?? false;
-  if (allGraded) {
-    return { status: "SUCCEEDED" };
+  // Use gradingCompleteTime as the authoritative done signal
+  if (submission.gradingCompleteTime) {
+    return submission.compileErrorMessage
+      ? { status: "FAILED" }
+      : { status: "SUCCEEDED" };
   }
 
-  // Check if there's a compile error
-  if (submission.compileErrorMessage) {
-    return { status: "FAILED" };
-  }
-
-  // Still running
   return { status: "RUNNING" };
 }
 

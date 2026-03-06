@@ -104,7 +104,6 @@ export function useWebSocket(options: UseWebSocketOptions): WebSocketState {
       ws.onopen = () => {
         if (!mountedRef.current) return;
 
-        console.log("[WebSocket] Connected");
         setState((prev) => ({ ...prev, isConnected: true, error: null }));
 
         // Reset reconnect delay on successful connection
@@ -140,15 +139,12 @@ export function useWebSocket(options: UseWebSocketOptions): WebSocketState {
       ws.onclose = (event) => {
         if (!mountedRef.current) return;
 
-        console.log("[WebSocket] Disconnected:", event.code, event.reason);
         setState((prev) => ({ ...prev, isConnected: false }));
         wsRef.current = null;
 
         // Schedule reconnection with exponential backoff
         if (enabled && mountedRef.current) {
           const delay = reconnectDelayRef.current;
-          console.log(`[WebSocket] Reconnecting in ${delay}ms...`);
-
           reconnectTimeoutRef.current = setTimeout(() => {
             if (mountedRef.current) {
               connect();

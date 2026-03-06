@@ -10,7 +10,6 @@ import {
   XCircle,
   AlertCircle,
   Timer,
-  RotateCcw,
   Copy,
   Download,
   User,
@@ -125,7 +124,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     return {
       id: index + 1,
       maxScore,
-      yourScore: submission.subtaskScores?.[index] || 0,
+      yourScore: +((( submission.subtaskScores?.[index] || 0) * maxScore / 100).toFixed(2)),
       verdict: subtaskVerdict,
       testcases,
     };
@@ -158,8 +157,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       verdict: getSubmissionVerdict(submission),
       totalScore: submission.totalScore,
       maxScore,
-      maxTime: submission.maxTime > 0 ? (submission.maxTime / 1000).toFixed(2) : "N/A",
-      maxMemory: submission.maxMemory > 0 ? (submission.maxMemory / 1000).toFixed(1) : "N/A",
+      maxTime: submission.gradingCompleteTime ? (submission.maxTime / 1000).toFixed(2) : "N/A",
+      maxMemory: submission.gradingCompleteTime ? (submission.maxMemory / 1000).toFixed(1) : "N/A",
       submissionTime: submission.submissionTime,
       gradingCompleteTime: submission.gradingCompleteTime || "Grading...",
       compileError: submission.compileErrorMessage || null,
@@ -167,7 +166,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       codeA,
       codeB,
       subtasks,
-      isGrading: submission.status?.slice(1).some((s) => s === 1) ?? true,
+      isGrading: !submission.gradingCompleteTime,
     },
   };
 }
@@ -235,10 +234,6 @@ export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Resubmit
-          </Button>
         </div>
       </div>
 

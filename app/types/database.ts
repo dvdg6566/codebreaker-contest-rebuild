@@ -262,8 +262,9 @@ export function getSubmissionVerdict(submission: Submission): SubmissionVerdict 
     return "pending";
   }
 
-  // Check if still grading
-  if (submission.status.slice(1).some(s => s === 1)) {
+  // Check if still grading (use gradingCompleteTime as authoritative signal)
+  const isDone = !!submission.gradingCompleteTime;
+  if (!isDone) {
     return "pending";
   }
 

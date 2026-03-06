@@ -97,7 +97,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       id: sub.subId,
       verdict: getSubmissionVerdict(sub),
       score: sub.totalScore,
-      time: sub.maxTime > 0 ? (sub.maxTime / 1000).toFixed(2) + "s" : "N/A",
+      time: (sub.maxTime > 0 || sub.maxMemory > 0) ? (sub.maxTime / 1000).toFixed(2) + "s" : "N/A",
       language: languageDisplay,
     };
   });

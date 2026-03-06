@@ -840,7 +840,7 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
                 <input ref={replaceHeaderRef} type="file" accept=".h" className="hidden" onChange={(e) => handleReplaceFile(e, "header", { filename: `${problem.problemName}.h` })} />
                 <input ref={replaceHeaderARef} type="file" accept=".h" className="hidden" onChange={(e) => handleReplaceFile(e, "header", { filename: `${problem.nameA || "fileA"}.h` })} />
                 <input ref={replaceHeaderBRef} type="file" accept=".h" className="hidden" onChange={(e) => handleReplaceFile(e, "header", { filename: `${problem.nameB || "fileB"}.h` })} />
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 items-start">
                 <Label>Grader Files</Label>
                   {/* grader.cpp */}
                   {existingFiles.graders.includes("grader.cpp") ? (
@@ -905,7 +905,7 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
                             </button>
                           </div>
                         ) : (
-                          <Button variant="outline" size="sm" onClick={() => replaceHeaderBRef.current?.click()} disabled={isUploading}>
+                          <Button variant="outline" size="sm" className="w-auto" onClick={() => replaceHeaderBRef.current?.click()} disabled={isUploading}>
                             <Upload className="mr-2 h-4 w-4" />Upload {headerB}
                           </Button>
                         )}

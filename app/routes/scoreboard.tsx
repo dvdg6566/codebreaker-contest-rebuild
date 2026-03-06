@@ -4,7 +4,6 @@ import {
   Trophy,
   Medal,
   Clock,
-  RefreshCw,
   ChevronUp,
   ChevronDown,
   Minus,
@@ -177,10 +176,6 @@ export default function Scoreboard({ loaderData }: Route.ComponentProps) {
               {contestInfo.status}
             </Badge>
           </div>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
         </div>
       </div>
 

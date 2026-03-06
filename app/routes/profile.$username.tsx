@@ -11,7 +11,6 @@ import {
   Clock,
   CheckCircle2,
   ChevronLeft,
-  Edit,
   Settings,
 } from "lucide-react";
 import {

@@ -1,5 +1,5 @@
 import type { Route } from "./+types/submissions";
-import { Link, useSearchParams } from "react-router";
+import { Link } from "react-router";
 import {
   Clock,
   CheckCircle2,
@@ -16,13 +16,6 @@ import {
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { ScoreBadge, type VerdictType } from "~/components/ui/score-badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
 import {
   Table,
   TableBody,
@@ -82,9 +75,6 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Submissions({ loaderData }: Route.ComponentProps) {
   const { submissions, problems, currentUser, contestActive } = loaderData;
-  const [searchParams] = useSearchParams();
-  const problemFilter = searchParams.get("problem") || "";
-
   // No active contest - show empty state
   if (!contestActive) {
     return (
@@ -173,41 +163,6 @@ export default function Submissions({ loaderData }: Route.ComponentProps) {
           </CardContent>
         </Card>
       </div>
-
-      {/* Filters */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <Select defaultValue={problemFilter || "all"}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="All Problems" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Problems</SelectItem>
-                {problems.map((problem) => (
-                  <SelectItem key={problem.problemName} value={problem.problemName}>
-                    {problem.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select defaultValue="all">
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="All Verdicts" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Verdicts</SelectItem>
-                <SelectItem value="AC">Accepted</SelectItem>
-                <SelectItem value="WA">Wrong Answer</SelectItem>
-                <SelectItem value="TLE">Time Limit</SelectItem>
-                <SelectItem value="MLE">Memory Limit</SelectItem>
-                <SelectItem value="RTE">Runtime Error</SelectItem>
-                <SelectItem value="CE">Compile Error</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Submissions Table */}
       <Card className="border-0 shadow-sm">

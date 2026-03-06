@@ -1,12 +1,10 @@
 import type { Route } from "./+types/problems";
 import { Link, Form } from "react-router";
 import {
-  FileText,
   Clock,
   CheckCircle2,
   AlertCircle,
-  Search,
-  Filter,
+
   Play,
   Trophy,
 } from "lucide-react";
@@ -17,17 +15,9 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
-import { Input } from "~/components/ui/input";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { ScoreBadge } from "~/components/ui/score-badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
 import { getProblemsForContest } from "~/lib/db/problems.server";
 import { getScoreboard } from "~/lib/db/scoreboard.server";
 import { getMaxScore } from "~/types/database";
@@ -211,43 +201,6 @@ export default function Problems({ loaderData }: Route.ComponentProps) {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search problems..."
-                className="pl-9 bg-muted/50"
-              />
-            </div>
-            <Select defaultValue="all">
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Difficulty" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Difficulties</SelectItem>
-                <SelectItem value="easy">Easy</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="hard">Hard</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select defaultValue="all">
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="solved">Solved</SelectItem>
-                <SelectItem value="attempted">Attempted</SelectItem>
-                <SelectItem value="unattempted">Not Attempted</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Problems List */}
       <div className="space-y-3">
         {problems.map((problem: {
@@ -282,8 +235,8 @@ export default function Problems({ loaderData }: Route.ComponentProps) {
                       >
                         {problem.difficulty}
                       </Badge>
-                      {problem.type === "Communication" && (
-                        <Badge variant="secondary">Communication</Badge>
+                      {problem.type && problem.type !== "Batch" && (
+                        <Badge variant="secondary">{problem.type}</Badge>
                       )}
                     </div>
                     <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
