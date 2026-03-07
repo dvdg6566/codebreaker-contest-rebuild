@@ -149,6 +149,8 @@ export function SubmissionManagementTable({ data }: SubmissionManagementTablePro
       data={data}
       searchKey="username"
       searchPlaceholder="Search by username..."
+      pageSizeOptions={[25, 50, 100]}
+      defaultPageSize={50}
     />
   );
 }

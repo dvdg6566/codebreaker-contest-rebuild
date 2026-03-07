@@ -29,18 +29,30 @@ async function getNextSubmissionId(): Promise<number> {
 }
 
 /**
- * Get all submissions (limited)
+ * Get all submissions with cursor-based pagination
  */
-export async function listSubmissions(limit = 100): Promise<Submission[]> {
+export async function listSubmissions(
+  limit = 500,
+  cursor?: string
+): Promise<{ items: Submission[]; nextCursor: string | null }> {
+  const exclusiveStartKey = cursor
+    ? JSON.parse(Buffer.from(cursor, "base64").toString())
+    : undefined;
+
   const result = await docClient.send(
     new ScanCommand({
       TableName: TableNames.submissions,
       Limit: limit,
+      ...(exclusiveStartKey && { ExclusiveStartKey: exclusiveStartKey }),
     })
   );
 
   const items = (result.Items || []) as Submission[];
-  return items.sort((a, b) => b.subId - a.subId);
+  const nextCursor = result.LastEvaluatedKey
+    ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString("base64")
+    : null;
+
+  return { items: items.sort((a, b) => b.subId - a.subId), nextCursor };
 }
 
 /**
@@ -49,7 +61,8 @@ export async function listSubmissions(limit = 100): Promise<Submission[]> {
 export async function listSubmissionsByTime(
   limit?: number
 ): Promise<Submission[]> {
-  return listSubmissions(limit || 100);
+  const { items } = await listSubmissions(limit || 100);
+  return items;
 }
 
 /**

@@ -251,7 +251,7 @@ export interface Submission {
 }
 
 /** Verdict type for display */
-export type SubmissionVerdict = "AC" | "WA" | "TLE" | "MLE" | "RTE" | "CE" | "pending";
+export type SubmissionVerdict = "AC" | "WA" | "TLE" | "MLE" | "RTE" | "CE" | "PS" | "pending";
 
 /**
  * Get overall verdict from submission data
@@ -279,10 +279,15 @@ export function getSubmissionVerdict(submission: Submission): SubmissionVerdict 
   }
 
   // Return first non-AC verdict
-  const nonAc = submission.verdicts.slice(1).find(v => v !== "AC" && v !== ":(");
+  const testcaseVerdicts = submission.verdicts.slice(1);
+  const nonAc = testcaseVerdicts.find(v => v !== "AC" && v !== ":(");
   if (nonAc === "TLE") return "TLE";
   if (nonAc === "MLE") return "MLE";
   if (nonAc === "RTE" || nonAc === "RE") return "RTE";
+
+  // Partial score: some testcases passed
+  const hasAc = testcaseVerdicts.some(v => v === "AC");
+  if (hasAc) return "PS";
 
   return "WA";
 }

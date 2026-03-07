@@ -36,6 +36,8 @@ interface DataTableProps<TData, TValue> {
   searchKey?: string;
   searchPlaceholder?: string;
   toolbar?: React.ReactNode;
+  pageSizeOptions?: number[];
+  defaultPageSize?: number;
 }
 
 export function DataTable<TData, TValue>({
@@ -44,6 +46,8 @@ export function DataTable<TData, TValue>({
   searchKey,
   searchPlaceholder = "Search...",
   toolbar,
+  pageSizeOptions,
+  defaultPageSize,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -54,6 +58,7 @@ export function DataTable<TData, TValue>({
   const [rowSelection, setRowSelection] = React.useState({});
 
   const table = useReactTable({
+    initialState: { pagination: { pageSize: defaultPageSize ?? 10 } },
     data,
     columns,
     onSortingChange: setSorting,
@@ -142,18 +147,21 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-      <DataTablePagination table={table} />
+      <DataTablePagination table={table} pageSizeOptions={pageSizeOptions} />
     </div>
   );
 }
 
 interface DataTablePaginationProps<TData> {
   table: ReturnType<typeof useReactTable<TData>>;
+  pageSizeOptions?: number[];
 }
 
 function DataTablePagination<TData>({
   table,
+  pageSizeOptions,
 }: DataTablePaginationProps<TData>) {
+  const sizes = pageSizeOptions ?? [10, 20, 30, 40, 50];
   return (
     <div className="flex items-center justify-between px-2">
       <div className="flex-1 text-sm text-muted-foreground">
@@ -170,7 +178,7 @@ function DataTablePagination<TData>({
             }}
             className="h-8 w-[70px] rounded-md border border-input bg-background px-2 text-sm"
           >
-            {[10, 20, 30, 40, 50].map((pageSize) => (
+            {sizes.map((pageSize) => (
               <option key={pageSize} value={pageSize}>
                 {pageSize}
               </option>

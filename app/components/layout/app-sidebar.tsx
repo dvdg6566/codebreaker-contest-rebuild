@@ -91,14 +91,19 @@ const adminNavItems = [
     icon: Users,
   },
   {
-    title: "Contests",
-    url: "/admin/contests",
-    icon: Trophy,
-  },
-  {
     title: "Problems",
     url: "/admin/problems",
     icon: Code2,
+  },
+  {
+    title: "Submissions",
+    url: "/admin/submissions",
+    icon: FileCode,
+  },
+  {
+    title: "Contests",
+    url: "/admin/contests",
+    icon: Trophy,
   },
   {
     title: "Announcements",
@@ -109,11 +114,6 @@ const adminNavItems = [
     title: "Clarifications",
     url: "/admin/clarifications",
     icon: MessageSquare,
-  },
-  {
-    title: "Submissions",
-    url: "/admin/submissions",
-    icon: FileCode,
   },
 ];
 

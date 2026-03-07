@@ -121,11 +121,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     const hasNonAC = testcases.some((tc) => tc.verdict !== "AC" && tc.verdict !== "judging" && tc.verdict !== "N/A");
     const subtaskVerdict = allAC ? "AC" : hasNonAC ? testcases.find((tc) => tc.verdict !== "AC" && tc.verdict !== "judging" && tc.verdict !== "N/A")?.verdict || "N/A" : "judging";
 
+    const subtaskPct = submission.subtaskScores?.[index] ?? 0;
+    const scoreVerdict = subtaskPct === 100 ? "AC" : subtaskPct === 0 ? "WA" : "PS";
     return {
       id: index + 1,
       maxScore,
-      yourScore: +((( submission.subtaskScores?.[index] || 0) * maxScore / 100).toFixed(2)),
+      yourScore: +((subtaskPct * maxScore / 100).toFixed(2)),
       verdict: subtaskVerdict,
+      scoreVerdict,
       testcases,
     };
   });
@@ -267,7 +270,7 @@ export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
                       </div>
                       <div className="flex items-center gap-4">
                         <ScoreBadge
-                          verdict={subtask.verdict as VerdictType}
+                          verdict={subtask.scoreVerdict as VerdictType}
                           score={subtask.yourScore}
                         />
                         <span className="text-sm text-muted-foreground">

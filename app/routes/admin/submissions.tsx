@@ -1,4 +1,6 @@
 import type { Route } from "./+types/submissions";
+import { useState, useEffect } from "react";
+import { useFetcher } from "react-router";
 import { FileCode } from "lucide-react";
 import { listSubmissions, getSubmissionVerdict } from "~/lib/db/submissions.server";
 import { listProblems } from "~/lib/db/problems.server";
@@ -7,6 +9,7 @@ import {
   SubmissionManagementTable,
   type SubmissionRow,
 } from "~/components/admin/submission-management-table";
+import { Button } from "~/components/ui/button";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -19,8 +22,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { requireAdmin } = await import("~/lib/auth.server");
   await requireAdmin(request);
 
-  const [submissions, problems] = await Promise.all([
-    listSubmissions(500),
+  const cursor = new URL(request.url).searchParams.get("cursor") ?? undefined;
+
+  const [{ items: submissions, nextCursor }, problems] = await Promise.all([
+    listSubmissions(500, cursor),
     listProblems(),
   ]);
 
@@ -58,11 +63,26 @@ export async function loader({ request }: Route.LoaderArgs) {
     };
   });
 
-  return { rows };
+  return { rows, nextCursor };
 }
 
 export default function AdminSubmissions({ loaderData }: Route.ComponentProps) {
-  const { rows } = loaderData;
+  const [rows, setRows] = useState<SubmissionRow[]>(loaderData.rows);
+  const [nextCursor, setNextCursor] = useState<string | null>(loaderData.nextCursor);
+  const fetcher = useFetcher<typeof loader>();
+
+  useEffect(() => {
+    if (fetcher.data) {
+      setRows((prev) => [...prev, ...fetcher.data!.rows]);
+      setNextCursor(fetcher.data.nextCursor);
+    }
+  }, [fetcher.data]);
+
+  const loadMore = () => {
+    if (nextCursor) {
+      fetcher.load(`/admin/submissions?cursor=${nextCursor}`);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -70,16 +90,28 @@ export default function AdminSubmissions({ loaderData }: Route.ComponentProps) {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">All Submissions</h1>
           <p className="text-muted-foreground">
-            {rows.length} submission{rows.length !== 1 ? "s" : ""} across all problems
+            Showing {rows.length} submission{rows.length !== 1 ? "s" : ""}
           </p>
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
           <FileCode className="h-5 w-5" />
-          <span className="text-sm">Latest 500</span>
+          <span className="text-sm">All Problems</span>
         </div>
       </div>
 
       <SubmissionManagementTable data={rows} />
+
+      {nextCursor && (
+        <div className="flex justify-center">
+          <Button
+            variant="outline"
+            onClick={loadMore}
+            disabled={fetcher.state === "loading"}
+          >
+            {fetcher.state === "loading" ? "Loading..." : "Load More"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
