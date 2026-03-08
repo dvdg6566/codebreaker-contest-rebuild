@@ -40,7 +40,7 @@ import {
 import { getCurrentUser } from "~/lib/auth.server";
 import { getClarificationsByUser, createClarification } from "~/lib/db/clarifications.server";
 import { listValidatedProblems } from "~/lib/db/problems.server";
-import { broadcastNewClarification } from "~/lib/websocket-broadcast.server";
+import { postClarification } from "~/lib/websocket-broadcast.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -106,11 +106,7 @@ export async function action({ request }: Route.ActionArgs) {
   );
 
   // Notify admins of the new clarification question
-  await broadcastNewClarification(
-    user.username,
-    question,
-    actualProblemName || undefined
-  );
+  await postClarification();
 
   return { success: true };
 }

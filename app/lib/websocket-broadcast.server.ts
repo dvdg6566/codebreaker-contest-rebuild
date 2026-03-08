@@ -154,34 +154,3 @@ export async function answerClarification(
   await invoke(response.Items || [], "answerClarification");
 }
 
-// Wrapper exports for route compatibility
-// Note: Extra params are ignored - the original architecture only sends notification pings,
-// the client fetches actual content from the database upon receiving the notification
-
-export async function broadcastAnnouncement(
-  _announcementId?: string,
-  _title?: string,
-  _priority?: "low" | "normal" | "high"
-): Promise<void> {
-  await announce();
-}
-
-export async function broadcastNewClarification(
-  _askedBy?: string,
-  _question?: string,
-  _problemName?: string
-): Promise<void> {
-  await postClarification();
-}
-
-export async function broadcastClarificationAnswer(
-  username: string,
-  _answer?: string,
-  _problemName?: string
-): Promise<void> {
-  // Need to look up user's role to query the GSI correctly
-  // For now, try both 'member' and 'admin' roles since user role isn't passed
-  // The query will simply return no results if the user isn't connected with that role
-  await answerClarification("member", username);
-  await answerClarification("admin", username);
-}

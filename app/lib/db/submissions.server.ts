@@ -55,15 +55,6 @@ export async function listSubmissions(
   return { items: items.sort((a, b) => b.subId - a.subId), nextCursor };
 }
 
-/**
- * Get submissions ordered by time (newest first)
- */
-export async function listSubmissionsByTime(
-  limit?: number
-): Promise<Submission[]> {
-  const { items } = await listSubmissions(limit || 100);
-  return items;
-}
 
 /**
  * Get a submission by ID

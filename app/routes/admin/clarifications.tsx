@@ -49,7 +49,7 @@ import {
 } from "~/lib/db/clarifications.server";
 import { getUser } from "~/lib/db/users.server";
 import { getProblem } from "~/lib/db/problems.server";
-import { broadcastClarificationAnswer } from "~/lib/websocket-broadcast.server";
+import { answerClarification as broadcastAnswerClarification } from "~/lib/websocket-broadcast.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -108,11 +108,9 @@ export async function action({ request }: Route.ActionArgs) {
     await answerClarification(askedBy, clarificationTime, answer, "admin");
 
     // Notify the user that their question was answered
-    await broadcastClarificationAnswer(
-      askedBy,
-      answer,
-      clarification?.problemName || undefined
-    );
+    // Try both member and admin roles since user role isn't passed
+    await broadcastAnswerClarification("member", askedBy);
+    await broadcastAnswerClarification("admin", askedBy);
 
     return { success: true };
   }

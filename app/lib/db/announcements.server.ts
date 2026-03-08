@@ -136,12 +136,3 @@ export async function deleteAnnouncement(
   return true;
 }
 
-/**
- * Get recent announcements (last N)
- */
-export async function getRecentAnnouncements(
-  limit: number
-): Promise<Announcement[]> {
-  const sorted = await listAnnouncements();
-  return sorted.slice(0, limit);
-}

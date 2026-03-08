@@ -63,7 +63,7 @@ import {
   updateAnnouncement,
   deleteAnnouncement,
 } from "~/lib/db/announcements.server";
-import { broadcastAnnouncement } from "~/lib/websocket-broadcast.server";
+import { announce } from "~/lib/websocket-broadcast.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -118,11 +118,7 @@ export async function action({ request }: Route.ActionArgs) {
     const announcement = await createAnnouncement(title, text, "admin", priority);
 
     // Broadcast notification to all connected users
-    await broadcastAnnouncement(
-      announcement.announcementId,
-      title,
-      priority
-    );
+    await announce();
 
     return { success: true };
   }

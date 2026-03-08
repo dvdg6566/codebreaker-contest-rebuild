@@ -123,30 +123,6 @@ export async function answerClarification(
   return (result.Attributes as Clarification) || null;
 }
 
-/**
- * Update a clarification's question (only if not answered)
- */
-export async function updateClarificationQuestion(
-  askedBy: string,
-  clarificationTime: string,
-  newQuestion: string
-): Promise<Clarification | null> {
-  const clarification = await getClarification(askedBy, clarificationTime);
-  if (!clarification || clarification.answer !== "") return null;
-
-  const result = await docClient.send(
-    new UpdateCommand({
-      TableName: TableNames.clarifications,
-      Key: { askedBy, clarificationTime },
-      UpdateExpression: "SET question = :question",
-      ExpressionAttributeValues: {
-        ":question": newQuestion,
-      },
-      ReturnValues: "ALL_NEW",
-    })
-  );
-  return (result.Attributes as Clarification) || null;
-}
 
 /**
  * Delete a clarification
@@ -164,37 +140,4 @@ export async function deleteClarification(
   return true;
 }
 
-/**
- * Count clarifications by status
- */
-export async function countClarificationsByStatus(): Promise<{
-  pending: number;
-  answered: number;
-  total: number;
-}> {
-  const all = await listClarifications();
-  const pending = all.filter((c) => c.answer === "").length;
-  const answered = all.filter((c) => c.answer !== "").length;
-  return {
-    pending,
-    answered,
-    total: all.length,
-  };
-}
-
-/**
- * Count clarifications for a user
- */
-export async function countUserClarifications(
-  username: string
-): Promise<{ pending: number; answered: number; total: number }> {
-  const userClars = await getClarificationsByUser(username);
-  const pending = userClars.filter((c) => c.answer === "").length;
-  const answered = userClars.filter((c) => c.answer !== "").length;
-  return {
-    pending,
-    answered,
-    total: userClars.length,
-  };
-}
 
