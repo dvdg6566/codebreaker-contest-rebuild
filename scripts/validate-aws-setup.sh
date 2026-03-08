@@ -75,6 +75,7 @@ check DYNAMO "$J-submissions"     "$(ok_dynamo $J-submissions)"
 check DYNAMO "$J-announcements"   "$(ok_dynamo $J-announcements)"
 check DYNAMO "$J-clarifications"  "$(ok_dynamo $J-clarifications)"
 check DYNAMO "$J-global-counters" "$(ok_dynamo $J-global-counters)"
+check DYNAMO "$J-submission-locks" "$(ok_dynamo $J-submission-locks)"
 check DYNAMO "$J-websocket"       "$(ok_dynamo $J-websocket)"
 echo ""
 
