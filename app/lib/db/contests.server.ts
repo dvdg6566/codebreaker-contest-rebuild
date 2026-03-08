@@ -4,7 +4,7 @@
  * Provides CRUD operations for contests using DynamoDB.
  */
 
-import type { Contest, ContestStatus } from "~/types/database";
+import type { Contest, ContestStatus, UserContestView, UserContestStatus } from "~/types/database";
 import { DEFAULT_CONTEST, parseDateTime, isDateTimeNotSet } from "~/types/database";
 import {
   docClient,
@@ -288,5 +288,75 @@ export async function updateContestScore(
  */
 export function calculateProblemScore(subtaskScores: number[]): number {
   return subtaskScores.reduce((sum, score) => sum + score, 0);
+}
+
+/**
+ * Get contests assigned to a specific user with computed status and participation info
+ */
+export async function getUserContests(username: string): Promise<UserContestView[]> {
+  // Get all contests first
+  const allContests = await listContests();
+
+  // Filter contests where user is explicitly assigned
+  const userContests = allContests.filter(contest => {
+    return contest.users && username in contest.users;
+  });
+
+  // Map to UserContestView with computed status and user participation
+  return userContests.map(contest => {
+    const status = getContestStatus(contest);
+    const userInContest = contest.users?.[username];
+
+    // Determine user status (user must be assigned since we filtered above)
+    let userStatus: UserContestStatus;
+    if (userInContest === "0") {
+      userStatus = "invited";
+    } else {
+      userStatus = status === "ENDED" ? "completed" : "started";
+    }
+
+    // Calculate time remaining for active contests
+    let timeRemaining: number | undefined;
+    if (status === "ONGOING") {
+      const now = new Date();
+      if (contest.mode === "centralized") {
+        const endTime = parseDateTime(contest.endTime);
+        timeRemaining = Math.max(0, (endTime.getTime() - now.getTime()) / 1000);
+      }
+      // For self-timer mode, time remaining would need individual user participation data
+      // This would require integration with the contest.server.ts participation system
+    }
+
+    // Determine if user can start contest (self-timer mode only)
+    const canStart = contest.mode === "self-timer" &&
+                    (status === "NOT_STARTED" || status === "ONGOING") &&
+                    userStatus === "invited";
+
+    // Determine if user can view contest content
+    const canView = status === "ONGOING" &&
+                   (userStatus === "started" || (contest.mode === "centralized" && userStatus === "invited"));
+
+    return {
+      contestId: contest.contestId,
+      contestName: contest.contestName,
+      description: contest.description,
+      status,
+      mode: contest.mode || "centralized",
+      userStatus,
+      startTime: contest.startTime,
+      endTime: contest.endTime,
+      duration: contest.duration,
+      timeRemaining,
+      problems: contest.problems,
+      canStart,
+      canView,
+      public: contest.public,
+    };
+  }).sort((a, b) => {
+    // Sort: ongoing first, then by start time
+    if (a.status === "ONGOING" && b.status !== "ONGOING") return -1;
+    if (b.status === "ONGOING" && a.status !== "ONGOING") return 1;
+    return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+  });
 }
 

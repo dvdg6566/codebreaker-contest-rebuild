@@ -84,6 +84,17 @@ export async function startUserContest(
     throw new Error("Contest not found");
   }
 
+  // SECURITY: Verify user has access to this contest
+  const userInContest = contest.users?.[username];
+  if (!userInContest) {
+    throw new Error("Access denied: You are not assigned to this contest");
+  }
+
+  // SECURITY: Verify user hasn't already started (only invited users can start)
+  if (userInContest && userInContest !== "0") {
+    throw new Error("You have already started this contest");
+  }
+
   if (contest.mode !== "self-timer") {
     throw new Error("This contest uses centralized timing");
   }

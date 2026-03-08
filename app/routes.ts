@@ -46,6 +46,7 @@ export default [
     index("routes/home.tsx"),
 
     // Contest routes
+    route("contests", "routes/contests.tsx"),
     route("problems", "routes/problems.tsx"),
     route("problems/:problemId", "routes/problems.$problemId.tsx"),
     route("submissions", "routes/submissions.tsx"),

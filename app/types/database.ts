@@ -59,6 +59,7 @@ export const DEFAULT_USER: Omit<User, "username" | "role"> = {
 
 export type ContestMode = "centralized" | "self-timer";
 export type ContestStatus = "NOT_STARTED" | "ONGOING" | "ENDED";
+export type UserContestStatus = "invited" | "started" | "completed";
 
 /**
  * Contest definition stored in DynamoDB
@@ -98,6 +99,40 @@ export interface Contest {
   publicScoreboard?: boolean;
   /** Contest creation timestamp */
   createdAt?: string;
+}
+
+/**
+ * User's view of a contest with computed status and participation info
+ */
+export interface UserContestView {
+  /** Contest ID */
+  contestId: string;
+  /** Contest name */
+  contestName: string;
+  /** Contest description */
+  description?: string;
+  /** Computed contest status */
+  status: ContestStatus;
+  /** Contest timing mode */
+  mode: ContestMode;
+  /** User's participation status */
+  userStatus: UserContestStatus;
+  /** Start time */
+  startTime: string;
+  /** End time */
+  endTime: string;
+  /** Duration in minutes for self-timer mode */
+  duration?: number;
+  /** Time remaining in seconds (if active) */
+  timeRemaining?: number;
+  /** List of problems in contest */
+  problems: string[];
+  /** Whether user can start the contest (self-timer mode) */
+  canStart: boolean;
+  /** Whether user can view contest content */
+  canView: boolean;
+  /** Whether contest is public */
+  public?: boolean;
 }
 
 /** Default values for new contests */
