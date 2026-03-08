@@ -49,6 +49,7 @@ export const TableNames = {
   contests: `${config.judgeName}-contests`,
   problems: `${config.judgeName}-problems`,
   submissions: `${config.judgeName}-submissions`,
+  submissionLocks: `${config.judgeName}-submission-locks`,
   announcements: `${config.judgeName}-announcements`,
   clarifications: `${config.judgeName}-clarifications`,
   globalCounters: `${config.judgeName}-global-counters`,

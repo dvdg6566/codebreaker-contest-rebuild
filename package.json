@@ -7,12 +7,14 @@
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
+    "validate": "bun run scripts/validate-aws-setup.ts",
     "init:users": "bun run scripts/init-users.ts",
     "init:testdata": "bun run scripts/init-testdata.ts",
     "init:problems": "bun run scripts/init-problems.ts",
     "init:all": "bun run init:users && bun run init:testdata && bun run init:problems"
   },
   "dependencies": {
+    "@aws-sdk/client-apigatewayv2": "^3.1004.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.995.0",
     "@aws-sdk/client-dynamodb": "^3.995.0",
     "@aws-sdk/client-lambda": "^3.996.0",
@@ -45,6 +47,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "dotenv": "^17.3.1",
     "isbot": "^5.1.31",
     "jszip": "^3.10.1",
     "lucide-react": "^0.575.0",

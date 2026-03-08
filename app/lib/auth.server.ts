@@ -1,5 +1,6 @@
 import { redirect } from "react-router";
 import { getSession, createSession, destroySession, type SessionData } from "./session.server";
+import { randomBytes } from "crypto";
 import {
   authenticate,
   getUserRole,
@@ -26,16 +27,24 @@ export async function login(
   // Get user role
   const role = await getUserRole(username);
 
+  // Calculate session duration in milliseconds
+  const sessionDurationMs = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 6 * 60 * 60 * 1000; // 7 days or 6 hours
+  const expiresAt = Date.now() + sessionDurationMs;
+
+  // SECURITY FIX 1: Generate unique session ID to prevent session fixation
+  const sessionId = randomBytes(32).toString('hex');
+
   // Create session data (minimal - tokens excluded to stay under 4KB cookie limit)
   const session: SessionData = {
+    sessionId, // Unique session identifier
     userId: tokenInfo.username,
     username: tokenInfo.username,
     role,
-    expiresAt: Date.now() + (rememberMe ? 7 * 24 * 60 * 60 * 1000 : 6 * 60 * 60 * 1000), // 7 days or 6 hours
+    expiresAt,
   };
 
-  // Create session cookie
-  const cookie = await createSession(session);
+  // SECURITY FIX 2: Create session cookie with matching maxAge (in seconds)
+  const cookie = await createSession(session, Math.floor(sessionDurationMs / 1000));
 
   return { session, cookie };
 }

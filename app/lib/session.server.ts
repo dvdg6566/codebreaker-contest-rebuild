@@ -11,7 +11,7 @@ if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
 
 export const sessionCookie = createCookie("__session", {
   httpOnly: true,
-  maxAge: 60 * 60 * 24 * 7, // 7 days
+  // maxAge will be set dynamically when creating sessions
   path: "/",
   sameSite: "lax",
   secrets: [sessionSecret],
@@ -19,6 +19,7 @@ export const sessionCookie = createCookie("__session", {
 });
 
 export interface SessionData {
+  sessionId: string; // For session regeneration security
   userId: string;
   username: string;
   role: UserRole;
@@ -43,8 +44,13 @@ export async function getSession(request: Request): Promise<SessionData | null> 
   return session as SessionData;
 }
 
-export async function createSession(data: SessionData): Promise<string> {
-  return sessionCookie.serialize(data);
+export async function createSession(data: SessionData, maxAge?: number): Promise<string> {
+  // Calculate maxAge from session duration if not provided
+  const cookieMaxAge = maxAge || Math.floor((data.expiresAt - Date.now()) / 1000);
+
+  return sessionCookie.serialize(data, {
+    maxAge: cookieMaxAge,
+  });
 }
 
 export async function destroySession(): Promise<string> {
