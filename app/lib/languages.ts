@@ -40,17 +40,15 @@ export function getLanguageExtension(id: string): string {
 }
 
 /**
- * Map from display name to short code
- */
-export const languagesByName: Record<string, LanguageId> = Object.fromEntries(
-  Object.entries(LANGUAGES).map(([id, config]) => [config.name, id as LanguageId])
-);
-
-/**
  * Get language ID from display name
  */
 export function getLanguageIdFromName(name: string): LanguageId | null {
-  return languagesByName[name] || null;
+  for (const [id, config] of Object.entries(LANGUAGES)) {
+    if (config.name === name) {
+      return id as LanguageId;
+    }
+  }
+  return null;
 }
 
 /**

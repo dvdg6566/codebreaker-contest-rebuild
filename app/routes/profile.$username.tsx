@@ -33,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
+import { getInitials } from "~/lib/utils";
 
 export function meta({ params }: Route.MetaArgs) {
   return [
@@ -127,13 +128,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 export default function Profile({ loaderData }: Route.ComponentProps) {
   const { userData, recentSubmissions, isCurrentUser } = loaderData;
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
-  };
 
   const problemScoreValues = Object.values(userData.problemScores) as number[];
   const totalScore = problemScoreValues.reduce((sum, score) => sum + score, 0);

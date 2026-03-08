@@ -439,14 +439,3 @@ export function isDateTimeNotSet(dateStr: string): boolean {
   return dateStr.startsWith("9999");
 }
 
-// =============================================================================
-// TYPE GUARDS
-// =============================================================================
-
-export function isAdmin(user: Pick<User, "role">): boolean {
-  return user.role === "admin";
-}
-
-export function isMember(user: Pick<User, "role">): boolean {
-  return user.role === "member";
-}

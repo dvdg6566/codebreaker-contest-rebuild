@@ -1,5 +1,5 @@
 import type { Route } from "./+types/users";
-import { createUser, listUsers, type UserRole } from "~/lib/auth-service.server";
+import { createUser, listUsers, type UserRole } from "~/lib/cognito.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { requireAdmin } = await import("~/lib/auth.server");

@@ -7,7 +7,6 @@
 import {
   SFNClient,
   StartExecutionCommand,
-  DescribeExecutionCommand,
 } from "@aws-sdk/client-sfn";
 import { getLanguageExtension, isValidLanguage } from "./languages";
 import { getProblem } from "./db/problems.server";
@@ -15,7 +14,6 @@ import {
   createSubmissionWithSource,
   createCommunicationSubmission,
   getSubmission,
-  markCompileError,
 } from "./db/submissions.server";
 
 // Configuration

@@ -241,7 +241,7 @@ export async function uploadTestcasesFromZip(
 /**
  * Upload individual testcase files
  */
-export async function uploadSingleTestcase(
+async function uploadSingleTestcase(
   problemName: string,
   number: number,
   inputContent: Buffer,
@@ -253,31 +253,6 @@ export async function uploadSingleTestcase(
   ]);
 }
 
-/**
- * Delete and renumber testcases (for reordering)
- */
-export async function renumberTestcases(
-  problemName: string,
-  newOrder: number[]
-): Promise<void> {
-  // Get existing testcases
-  const existing = await listTestcases(problemName);
-  const existingNumbers = new Set(existing.map((tc) => tc.number));
-
-  // Validate new order contains only existing testcases
-  for (const num of newOrder) {
-    if (!existingNumbers.has(num)) {
-      throw new Error(`Testcase ${num} does not exist`);
-    }
-  }
-
-  // This is a complex operation that would need to:
-  // 1. Download all testcases
-  // 2. Delete all testcases
-  // 3. Re-upload in new order with new numbers
-  // For now, this is a placeholder for future implementation
-  throw new Error("Renumbering not yet implemented");
-}
 
 /**
  * Validate that testcases exist for a problem

@@ -15,8 +15,9 @@ import {
   LogOut,
   FileCode,
 } from "lucide-react";
-import { useAuth } from "~/hooks/use-auth";
+import { useAuth } from "~/context/auth-context";
 import { useNotifications } from "~/context/websocket-context";
+import { getInitials } from "~/lib/utils";
 
 import {
   Sidebar,
@@ -133,10 +134,6 @@ export function AppSidebar() {
 
   const isAdminSection = pathname.startsWith("/admin");
 
-  // Get initials from username
-  const getInitials = (name: string) => {
-    return name.slice(0, 2).toUpperCase();
-  };
 
   return (
     <Sidebar collapsible="icon">

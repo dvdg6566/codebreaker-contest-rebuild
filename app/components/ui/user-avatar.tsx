@@ -1,5 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { cn } from "~/lib/utils";
+import { cn, getInitials } from "~/lib/utils";
 
 interface UserAvatarProps {
   name: string;
@@ -22,14 +22,6 @@ const textSizeClasses = {
   lg: "text-base",
 };
 
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
 
 export function UserAvatar({
   name,

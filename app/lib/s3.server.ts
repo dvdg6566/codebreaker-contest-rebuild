@@ -13,6 +13,7 @@ import {
   ListObjectsV2Command,
   type PutObjectCommandInput,
 } from "@aws-sdk/client-s3";
+import { getLanguageExtension } from "./languages";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { BucketNames } from "./db/dynamodb-client.server";
 
@@ -467,21 +468,6 @@ export async function countTestcases(problemName: string): Promise<number> {
 // SUBMISSION SOURCE OPERATIONS
 // =============================================================================
 
-/**
- * Get file extension for a language
- */
-function getLanguageExtension(language: string): string {
-  switch (language) {
-    case "cpp":
-      return "cpp";
-    case "py":
-      return "py";
-    case "java":
-      return "java";
-    default:
-      return language;
-  }
-}
 
 /**
  * Upload submission source code

@@ -6,7 +6,7 @@ import {
   updateUserRole,
   updateUserEmail,
   type UserRole,
-} from "~/lib/auth-service.server";
+} from "~/lib/cognito.server";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { requireAdmin } = await import("~/lib/auth.server");

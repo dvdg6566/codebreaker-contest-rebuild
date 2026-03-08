@@ -6,7 +6,7 @@ import {
   getUserRole,
   parseIdToken,
   type UserRole,
-} from "./auth-service.server";
+} from "./cognito.server";
 
 export type { SessionData, UserRole };
 
@@ -89,10 +89,3 @@ export async function getCurrentUser(request: Request): Promise<SessionData | nu
   return getSession(request);
 }
 
-/**
- * Check if user is authenticated
- */
-export async function isAuthenticated(request: Request): Promise<boolean> {
-  const session = await getSession(request);
-  return session !== null;
-}
