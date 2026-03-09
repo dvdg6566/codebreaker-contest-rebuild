@@ -16,7 +16,6 @@ export type UserRole = "admin" | "member";
 /**
  * User account stored in DynamoDB
  * PK: username
- * GSI: contestIndex (on contest field)
  */
 export interface User {
   /** Primary Key - Unique username */

@@ -24,9 +24,10 @@
 
 ## 1. System Overview
 
-The Codebreaker Contest System is a modern, scalable competitive programming platform built with React Router 7 frontend and AWS serverless backend. It supports real-time submissions, automated grading, live scoreboards, and administrative management.
+The Codebreaker Contest System is a modern, scalable competitive programming platform built with React Router 7 frontend and AWS serverless backend. It supports automated submission grading, contest scoreboards, real-time announcements, and comprehensive administrative management.
 
 ![Codebreaker Contest Architecture](./Codebreaker-Architecture.png)
+
 *Figure 1: Complete system architecture showing frontend, backend services, and AWS infrastructure*
 
 ### 1.1 Technology Stack
@@ -52,8 +53,8 @@ The Codebreaker Contest System is a modern, scalable competitive programming pla
 
 - **Contest Management**: Create and manage programming contests with flexible timing modes
 - **Problem Management**: Upload problems with test cases, custom checkers, and validators
-- **Submission Processing**: Support for C++, Python, Java with real-time grading
-- **Real-time Updates**: Live scoreboard updates via WebSocket
+- **Submission Processing**: Support for C++, Python, Java with automated grading
+- **Real-time Communication**: Announcements and clarification notifications via WebSocket
 - **Admin Tools**: User management, clarifications, announcements
 - **Security**: Role-based access control, AWS IAM integration
 
@@ -136,7 +137,6 @@ All data is stored in AWS DynamoDB tables with the naming pattern `{judgeName}-{
 
 **Table Name:** `{judgeName}-users`
 **Primary Key:** `username`
-**GSI:** `contestIndex` (on `contest` field)
 
 ```typescript
 interface User {
@@ -394,7 +394,7 @@ All Lambda functions use Python 3.9 runtime and follow the naming pattern `{judg
 1. Collects all testcase results from parallel executions
 2. Calculates subtask scores based on problem configuration
 3. Updates DynamoDB with final results
-4. Triggers WebSocket notifications for live updates
+4. Updates user scores and submission records
 
 ### 4.2 Problem Management Functions
 
@@ -568,20 +568,27 @@ End
 
 ### 6.1 Real-time Communication Architecture
 
-The system uses AWS API Gateway WebSocket for bidirectional real-time communication with automatic scaling and connection management.
+The system uses AWS API Gateway WebSocket for real-time communication focused on **announcements and clarifications only**. It does not handle live scoreboard updates or submission results.
 
 **Endpoints:**
 - **WebSocket API:** `wss://{api-id}.execute-api.{region}.amazonaws.com/{stage}`
 - **Connection Management:** DynamoDB table with TTL for automatic cleanup
+
+**Scope of Real-time Updates:**
+- ✅ Contest announcements to all users
+- ✅ New clarification notifications to admins
+- ✅ Clarification answer notifications to users
+- ❌ Live scoreboard updates (requires page refresh)
+- ❌ Submission results (requires page refresh)
 
 ### 6.2 Broadcast Service
 
 **Location:** `app/lib/websocket-broadcast.server.ts`
 
 **Functions:**
-- `announce()`: Broadcasts announcements to all connected users
-- `postClarification()`: Notifies all admin users of new clarifications
-- `answerClarification(role, username)`: Notifies specific user of clarification answers
+- `announce()`: Broadcasts general announcements to all connected users
+- `postClarification()`: Notifies all admin users when contestants ask new questions
+- `answerClarification(role, username)`: Notifies specific user when their clarification is answered
 
 **Implementation:**
 1. Query DynamoDB for relevant connections using GSI
@@ -599,7 +606,7 @@ Authenticate via JWT
   ↓
 Store in DynamoDB with TTL
   ↓
-Real-time notifications
+Real-time announcements/clarifications
   ↓
 Automatic cleanup on disconnect/TTL
 ```
@@ -855,8 +862,8 @@ All API routes are server-side rendered React Router routes with type-safe loade
 3. Route action handles file upload to S3
 4. DynamoDB submission record created
 5. Step Function grading workflow triggered
-6. Real-time updates via WebSocket
-7. Results displayed on scoreboard and submission pages
+6. Grading results stored in DynamoDB
+7. Users can view results on submission and scoreboard pages (refresh required)
 
 ---
 
@@ -1079,7 +1086,7 @@ This documentation provides a complete architectural overview of the Codebreaker
 
 **Key Strengths:**
 - **Scalability:** Serverless architecture scales automatically with load
-- **Real-time Updates:** WebSocket integration provides live feedback
+- **Real-time Communication:** WebSocket integration for announcements and clarifications
 - **Security:** Comprehensive authentication and authorization
 - **Automation:** Fully automated deployment and resource management
 - **Flexibility:** Support for multiple programming languages and contest formats
