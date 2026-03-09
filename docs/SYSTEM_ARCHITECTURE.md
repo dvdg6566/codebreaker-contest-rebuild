@@ -26,6 +26,9 @@
 
 The Codebreaker Contest System is a modern, scalable competitive programming platform built with React Router 7 frontend and AWS serverless backend. It supports real-time submissions, automated grading, live scoreboards, and administrative management.
 
+![Codebreaker Contest Architecture](./Codebreaker-Architecture.png)
+*Figure 1: Complete system architecture showing frontend, backend services, and AWS infrastructure*
+
 ### 1.1 Technology Stack
 
 **Frontend:**
