@@ -4,18 +4,20 @@ import { useEffect, useRef, useState, useCallback } from "react";
  * WebSocket message from the server
  */
 export interface WebSocketMessage {
-  messageType: "announce" | "postClarification" | "answerClarification";
-  payload: Record<string, unknown>;
-  timestamp: string;
+  notificationType: "announce" | "postClarification" | "answerClarification" | "endContest";
+  contestId?: string;
+  username?: string;
+  timestamp?: string;
 }
 
 /**
  * Identity message sent on connection
  */
 interface IdentityMessage {
-  action: "identity";
+  action: "message";
   accountRole: string;
   username: string;
+  contestId: string;
 }
 
 /**
@@ -28,6 +30,8 @@ interface UseWebSocketOptions {
   accountRole: string;
   /** User's username */
   username: string;
+  /** Current contest ID (for contest-scoped notifications) */
+  contestId?: string;
   /** Whether to connect (defaults to true if url is provided) */
   enabled?: boolean;
   /** Callback when a message is received */
@@ -56,8 +60,8 @@ const RECONNECT_MULTIPLIER = 2;
  * - Exponential backoff reconnection (1s, 2s, 4s... max 32s)
  * - Automatic cleanup on unmount
  */
-export function useWebSocket(options: UseWebSocketOptions): WebSocketState {
-  const { url, accountRole, username, enabled = true, onMessage } = options;
+export function useWebSocket(options: UseWebSocketOptions): WebSocketState & { sendIdentity: (contestId?: string) => void } {
+  const { url, accountRole, username, contestId = "", enabled = true, onMessage } = options;
 
   const [state, setState] = useState<WebSocketState>({
     isConnected: false,
@@ -109,11 +113,12 @@ export function useWebSocket(options: UseWebSocketOptions): WebSocketState {
         // Reset reconnect delay on successful connection
         reconnectDelayRef.current = MIN_RECONNECT_DELAY;
 
-        // Send identity message
+        // Send identity message with contestId
         const identityMessage: IdentityMessage = {
-          action: "identity",
+          action: "message",
           accountRole,
           username,
+          contestId,
         };
         ws.send(JSON.stringify(identityMessage));
       };
@@ -165,7 +170,7 @@ export function useWebSocket(options: UseWebSocketOptions): WebSocketState {
         error: err instanceof Error ? err.message : "Failed to connect",
       }));
     }
-  }, [url, accountRole, username, enabled, clearReconnectTimeout]);
+  }, [url, accountRole, username, contestId, enabled, clearReconnectTimeout]);
 
   // Connect on mount, disconnect on unmount
   useEffect(() => {
@@ -186,5 +191,18 @@ export function useWebSocket(options: UseWebSocketOptions): WebSocketState {
     };
   }, [url, enabled, connect, clearReconnectTimeout]);
 
-  return state;
+  // Send updated identity (e.g., when contestId changes)
+  const sendIdentity = useCallback((newContestId?: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      const identityMessage: IdentityMessage = {
+        action: "message",
+        accountRole,
+        username,
+        contestId: newContestId ?? contestId,
+      };
+      wsRef.current.send(JSON.stringify(identityMessage));
+    }
+  }, [accountRole, username, contestId]);
+
+  return { ...state, sendIdentity };
 }

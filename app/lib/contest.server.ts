@@ -4,6 +4,7 @@
 
 import type { Contest, ContestMode, ContestStatus } from "~/types/database";
 import { parseDateTime, isDateTimeNotSet, formatDateTime } from "~/types/database";
+import { scheduleUserContestEnd } from "./scheduler.server";
 import {
   getContest as dbGetContest,
   getContestStatus,
@@ -144,6 +145,9 @@ export async function startUserContest(
   // Store participation in memory (existing pattern)
   const key = `${username}:${contestId}`;
   userParticipations.set(key, userParticipation);
+
+  // Schedule end notification
+  await scheduleUserContestEnd(contestId, username, userParticipation.endsAt!);
 
   return userParticipation;
 }

@@ -15,6 +15,10 @@ import {
   DeleteCommand,
   ScanCommand,
 } from "./dynamodb-client.server";
+import {
+  scheduleContestEnd,
+  cancelContestEndSchedule,
+} from "../scheduler.server";
 
 /**
  * Calculate contest status from start/end times
@@ -102,6 +106,12 @@ export async function createContest(
     })
   );
 
+  // Schedule end notification for centralized contests
+  if (contest.mode === "centralized" && !isDateTimeNotSet(contest.endTime)) {
+    const endTime = parseDateTime(contest.endTime);
+    await scheduleContestEnd(contestId, endTime);
+  }
+
   return contest;
 }
 
@@ -141,13 +151,29 @@ export async function updateContest(
     })
   );
 
-  return (result.Attributes as Contest) || null;
+  const updatedContest = (result.Attributes as Contest) || null;
+
+  // Reschedule end notification if endTime or mode changed
+  if (updatedContest && ("endTime" in updates || "mode" in updates)) {
+    if (updatedContest.mode === "centralized" && !isDateTimeNotSet(updatedContest.endTime)) {
+      const endTime = parseDateTime(updatedContest.endTime);
+      await scheduleContestEnd(contestId, endTime);
+    } else {
+      // Cancel schedule if switched to self-timer or no end time
+      await cancelContestEndSchedule(contestId);
+    }
+  }
+
+  return updatedContest;
 }
 
 /**
  * Delete a contest
  */
 export async function deleteContest(contestId: string): Promise<boolean> {
+  // Cancel any scheduled end notification
+  await cancelContestEndSchedule(contestId);
+
   await docClient.send(
     new DeleteCommand({
       TableName: TableNames.contests,

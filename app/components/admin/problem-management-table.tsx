@@ -1,21 +1,13 @@
 import * as React from "react";
 import { Link } from "react-router";
 import { type ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Plus, Search, ExternalLink } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 
 import { DataTable } from "~/components/ui/data-table";
 import { DataTableColumnHeader } from "~/components/ui/data-table-column-header";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +30,7 @@ export const problemColumns: ColumnDef<ProblemListItem>[] = [
       const problemName = row.getValue("problemName") as string;
       return (
         <Link
-          to={`/admin/problems/${problemName}`}
+          to={`/problems/${problemName}`}
           className="font-medium text-primary hover:underline"
         >
           {problemName}
@@ -105,34 +97,12 @@ export const problemColumns: ColumnDef<ProblemListItem>[] = [
       const problem = row.original;
 
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem asChild>
-              <Link to={`/admin/problems/${problem.problemName}`}>
-                Edit problem
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to={`/problem/${problem.problemName}`} target="_blank">
-                <ExternalLink className="mr-2 h-4 w-4" />
-                View problem
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(problem.problemName)}
-            >
-              Copy problem ID
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button variant="ghost" size="icon" asChild>
+          <Link to={`/admin/problems/${problem.problemName}`}>
+            <Pencil className="h-4 w-4" />
+            <span className="sr-only">Edit problem</span>
+          </Link>
+        </Button>
       );
     },
   },

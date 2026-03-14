@@ -4,6 +4,7 @@ import {
   useState,
   useCallback,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react";
 import { useWebSocket, type WebSocketMessage } from "~/hooks/use-websocket";
@@ -14,14 +15,21 @@ import { useAuth } from "~/context/auth-context";
  */
 export interface Notification {
   id: string;
-  type: "announce" | "postClarification" | "answerClarification";
+  type: "announce" | "postClarification" | "answerClarification" | "endContest";
   title: string;
   message: string;
   timestamp: string;
   read: boolean;
   /** Navigation path when clicked */
   href?: string;
+  /** Contest ID for contest-specific notifications */
+  contestId?: string;
 }
+
+/**
+ * Callback for contest end events
+ */
+export type ContestEndCallback = (contestId: string, username?: string) => void;
 
 /**
  * WebSocket context value
@@ -43,6 +51,12 @@ interface WebSocketContextType {
   markAllAsRead: () => void;
   /** Clear all notifications */
   clearAll: () => void;
+  /** Current contest ID for scoped notifications */
+  contestId: string;
+  /** Update current contest ID */
+  setContestId: (contestId: string) => void;
+  /** Register callback for contest end events */
+  onContestEnd: (callback: ContestEndCallback) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(
@@ -65,23 +79,19 @@ const MAX_NOTIFICATIONS = 50;
  */
 function createNotificationFromMessage(
   message: WebSocketMessage,
-  isAdmin: boolean
+  isAdmin: boolean,
+  currentContestId: string
 ): Notification | null {
-  const id = `${message.messageType}-${message.timestamp}-${Math.random().toString(36).slice(2)}`;
-  const timestamp = message.timestamp;
+  const id = `${message.notificationType}-${message.timestamp || Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const timestamp = message.timestamp || new Date().toISOString();
 
-  switch (message.messageType) {
+  switch (message.notificationType) {
     case "announce": {
-      const { title, announcementId, priority } = message.payload as {
-        title?: string;
-        announcementId?: string;
-        priority?: string;
-      };
       return {
         id,
         type: "announce",
-        title: priority === "high" ? "Important Announcement" : "New Announcement",
-        message: title || "A new announcement has been posted",
+        title: "New Announcement",
+        message: "A new announcement has been posted",
         timestamp,
         read: false,
         href: "/announcements",
@@ -91,15 +101,11 @@ function createNotificationFromMessage(
     case "postClarification": {
       // Only admins receive this
       if (!isAdmin) return null;
-      const { askedBy, question } = message.payload as {
-        askedBy?: string;
-        question?: string;
-      };
       return {
         id,
         type: "postClarification",
         title: "New Clarification Question",
-        message: `${askedBy}: ${question?.slice(0, 100)}${(question?.length || 0) > 100 ? "..." : ""}`,
+        message: "A new clarification question has been posted",
         timestamp,
         read: false,
         href: "/admin/clarifications",
@@ -107,21 +113,33 @@ function createNotificationFromMessage(
     }
 
     case "answerClarification": {
-      // Only the target user receives this
-      const { answer, problemName } = message.payload as {
-        answer?: string;
-        problemName?: string;
-      };
       return {
         id,
         type: "answerClarification",
         title: "Clarification Answered",
-        message: problemName
-          ? `Your question about ${problemName} has been answered: ${answer}`
-          : `Your question has been answered: ${answer}`,
+        message: "Your question has been answered",
         timestamp,
         read: false,
         href: "/clarifications",
+      };
+    }
+
+    case "endContest": {
+      // Only show notification if it's for the current contest
+      if (message.contestId && message.contestId !== currentContestId) {
+        return null;
+      }
+      return {
+        id,
+        type: "endContest",
+        title: "Contest Ended",
+        message: message.username
+          ? "Your contest time has ended"
+          : "The contest has ended",
+        timestamp,
+        read: false,
+        contestId: message.contestId,
+        href: message.contestId ? `/contests/${message.contestId}/scoreboard` : undefined,
       };
     }
 
@@ -136,11 +154,20 @@ export function WebSocketProvider({
 }: WebSocketProviderProps) {
   const { user, isAuthenticated, isAdmin } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [contestId, setContestIdState] = useState<string>("");
+  const contestEndCallbacksRef = useRef<Set<ContestEndCallback>>(new Set());
 
   // Handle incoming WebSocket messages
   const handleMessage = useCallback(
     (message: WebSocketMessage) => {
-      const notification = createNotificationFromMessage(message, isAdmin);
+      // Handle contest end separately - call registered callbacks
+      if (message.notificationType === "endContest" && message.contestId) {
+        contestEndCallbacksRef.current.forEach((callback) => {
+          callback(message.contestId!, message.username);
+        });
+      }
+
+      const notification = createNotificationFromMessage(message, isAdmin, contestId);
       if (!notification) return;
 
       setNotifications((prev) => {
@@ -150,17 +177,32 @@ export function WebSocketProvider({
         return updated.slice(0, MAX_NOTIFICATIONS);
       });
     },
-    [isAdmin]
+    [isAdmin, contestId]
   );
 
   // Connect to WebSocket only when authenticated
-  const { isConnected } = useWebSocket({
+  const { isConnected, sendIdentity } = useWebSocket({
     url: wsEndpoint,
     accountRole: user?.role || "user",
     username: user?.username || "",
+    contestId,
     enabled: isAuthenticated && !!wsEndpoint,
     onMessage: handleMessage,
   });
+
+  // Update contestId and send to server
+  const setContestId = useCallback((newContestId: string) => {
+    setContestIdState(newContestId);
+    sendIdentity(newContestId);
+  }, [sendIdentity]);
+
+  // Register contest end callback
+  const onContestEnd = useCallback((callback: ContestEndCallback) => {
+    contestEndCallbacksRef.current.add(callback);
+    return () => {
+      contestEndCallbacksRef.current.delete(callback);
+    };
+  }, []);
 
   // Mark a single notification as read
   const markAsRead = useCallback((id: string) => {
@@ -209,6 +251,9 @@ export function WebSocketProvider({
     markAsRead,
     markAllAsRead,
     clearAll,
+    contestId,
+    setContestId,
+    onContestEnd,
   };
 
   return (
