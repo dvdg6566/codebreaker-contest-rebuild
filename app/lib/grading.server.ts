@@ -41,6 +41,7 @@ export interface SubmissionParams {
   code: string;
   codeA?: string; // For Communication problems
   codeB?: string; // For Communication problems
+  contestId?: string; // Contest ID, defaults to "global" for admin submissions
 }
 
 /**
@@ -58,7 +59,7 @@ export interface SubmissionResult {
 export async function submitForGrading(
   params: SubmissionParams
 ): Promise<SubmissionResult> {
-  const { username, problemName, language, code, codeA, codeB } = params;
+  const { username, problemName, language, code, codeA, codeB, contestId = "global" } = params;
 
   // Validate language
   if (!isValidLanguage(language)) {
@@ -108,6 +109,7 @@ export async function submitForGrading(
       language,
       codeA,
       codeB,
+      contestId,
       problem.testcaseCount
     );
   } else {
@@ -120,6 +122,7 @@ export async function submitForGrading(
       problemName,
       language,
       code,
+      contestId,
       problem.testcaseCount
     );
   }

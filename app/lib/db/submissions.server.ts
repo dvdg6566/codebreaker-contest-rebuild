@@ -263,6 +263,7 @@ export async function createCommunicationSubmission(
   language: string,
   sourceCodeA: string,
   sourceCodeB: string,
+  contestId: string,
   testcaseCount?: number
 ): Promise<Submission> {
   // Create the submission record first
@@ -270,6 +271,7 @@ export async function createCommunicationSubmission(
     username,
     problemName,
     language,
+    contestId,
     testcaseCount
   );
 

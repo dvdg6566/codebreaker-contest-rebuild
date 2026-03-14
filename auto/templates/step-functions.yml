@@ -21,6 +21,7 @@ Resources:
       Name: !Sub ${JudgeName}-grading
       DefinitionUri: ../state-machines/grading.asl.json
       DefinitionSubstitutions:
+        CompilerFunctionArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${JudgeName}-compiler
         ProblemInitFunctionArn: !Ref GraderProblemInitFunctionArn
         TestcaseGraderWrapperFunctionArn: !Ref TestcaseGraderWrapperFunctionArn
         ProblemScorerFunctionArn: !Ref GraderProblemScorerFunctionArn
