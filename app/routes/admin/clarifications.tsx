@@ -58,14 +58,24 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export async function loader({}: Route.LoaderArgs) {
-  const dbClarifications = await listClarifications();
+export async function loader({ request }: Route.LoaderArgs) {
+  const { requireAdmin } = await import("~/lib/auth.server");
+  const { listClarifications } = await import("~/lib/db/clarifications.server");
+  const { listContests } = await import("~/lib/db/contests.server");
+
+  await requireAdmin(request);
+
+  const [dbClarifications, contests] = await Promise.all([
+    listClarifications(),
+    listContests(),
+  ]);
 
   // Map database clarifications to display format
   const clarifications = await Promise.all(
     dbClarifications.map(async (c) => {
       const user = await getUser(c.askedBy);
       const problem = c.problemName ? await getProblem(c.problemName) : null;
+      const contest = contests.find(contest => contest.contestId === c.contestId);
 
       return {
         id: `${c.askedBy}:${c.clarificationTime}`,
@@ -78,11 +88,13 @@ export async function loader({}: Route.LoaderArgs) {
         answeredBy: c.answeredBy || null,
         status: c.answer ? "answered" : "pending",
         time: c.clarificationTime,
+        contestId: c.contestId,
+        contestName: contest?.contestName || c.contestId,
       };
     })
   );
 
-  return { clarifications };
+  return { clarifications, contests };
 }
 
 export async function action({ request }: Route.ActionArgs) {

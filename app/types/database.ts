@@ -360,6 +360,8 @@ export function getMaxScore(problem: Pick<Problem, "subtaskScores">): number {
 export interface Announcement {
   /** Primary Key - UUID */
   announcementId: string;
+  /** Contest ID this announcement belongs to */
+  contestId: string;
   /** Announcement title */
   title: string;
   /** Announcement body text */
@@ -388,6 +390,8 @@ export interface Clarification {
   askedBy: string;
   /** Sort Key - Time asked: "YYYY-MM-DD HH:MM:SS" */
   clarificationTime: string;
+  /** Contest ID this clarification belongs to */
+  contestId: string;
   /** Related problem (empty string for general questions) */
   problemName: string;
   /** The question text */

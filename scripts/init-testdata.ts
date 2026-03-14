@@ -64,8 +64,8 @@ async function putItem(tableName: string, item: Record<string, unknown>): Promis
 // Time calculations (needed for user data)
 // ============================================================================
 const now = new Date();
-const startTime = new Date(now.getTime() - 2 * 60 * 60 * 1000); // Started 2 hours ago
-const endTime = new Date(now.getTime() + 3 * 60 * 60 * 1000); // Ends in 3 hours
+const startTime = new Date(now.getTime() - 5 * 60 * 60 * 1000); // Started 5 hours ago
+const endTime = new Date(now.getTime() - 1 * 60 * 60 * 1000); // Ended 1 hour ago
 
 // ============================================================================
 // Sample Users (Multi-Contest Schema)

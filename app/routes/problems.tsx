@@ -12,10 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { listProblems } from "~/lib/db/problems.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { requireAdmin } = await import("~/lib/auth.server");
+  const { listProblems } = await import("~/lib/db/problems.server");
 
   // This throws 403 if not admin
   await requireAdmin(request);

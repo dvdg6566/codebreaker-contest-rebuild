@@ -85,8 +85,17 @@ function typeToPriority(type: string): "low" | "normal" | "high" {
   return "normal";
 }
 
-export async function loader({}: Route.LoaderArgs) {
-  const dbAnnouncements = await listAnnouncements();
+export async function loader({ request }: Route.LoaderArgs) {
+  const { requireAdmin } = await import("~/lib/auth.server");
+  const { listAnnouncements } = await import("~/lib/db/announcements.server");
+  const { listContests } = await import("~/lib/db/contests.server");
+
+  await requireAdmin(request);
+
+  const [dbAnnouncements, contests] = await Promise.all([
+    listAnnouncements(),
+    listContests(),
+  ]);
 
   // Map database announcements to display format
   const announcements = dbAnnouncements.map((a) => ({
@@ -96,12 +105,20 @@ export async function loader({}: Route.LoaderArgs) {
     time: a.announcementTime,
     type: priorityToType(a.priority),
     author: a.author || "admin",
+    contestId: a.contestId,
+    contestName: contests.find(c => c.contestId === a.contestId)?.contestName || a.contestId,
   }));
 
-  return { announcements };
+  return { announcements, contests };
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  const { requireAdmin } = await import("~/lib/auth.server");
+  const { createAnnouncement, updateAnnouncement, deleteAnnouncement } = await import("~/lib/db/announcements.server");
+  const { announce } = await import("~/lib/websocket-broadcast.server");
+
+  await requireAdmin(request);
+
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
 
@@ -109,13 +126,14 @@ export async function action({ request }: Route.ActionArgs) {
     const title = formData.get("title") as string;
     const text = formData.get("text") as string;
     const type = formData.get("type") as string;
+    const contestId = formData.get("contestId") as string;
 
-    if (!title || !text) {
-      return data({ error: "Title and content are required" }, { status: 400 });
+    if (!title || !text || !contestId) {
+      return data({ error: "Title, content, and contest are required" }, { status: 400 });
     }
 
     const priority = typeToPriority(type);
-    const announcement = await createAnnouncement(title, text, "admin", priority);
+    const announcement = await createAnnouncement(title, text, contestId, "admin", priority);
 
     // Broadcast notification to all connected users
     await announce();
@@ -170,12 +188,12 @@ const typeConfig = {
 };
 
 export default function AdminAnnouncements({ loaderData }: Route.ComponentProps) {
-  const { announcements } = loaderData;
+  const { announcements, contests } = loaderData;
   const submit = useSubmit();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
-  const [newAnnouncement, setNewAnnouncement] = useState({ title: "", text: "", type: "info" });
+  const [newAnnouncement, setNewAnnouncement] = useState({ title: "", text: "", type: "info", contestId: "" });
   const [editAnnouncement, setEditAnnouncement] = useState({ title: "", text: "", type: "info" });
 
   const handleCreate = () => {
@@ -184,9 +202,10 @@ export default function AdminAnnouncements({ loaderData }: Route.ComponentProps)
     formData.set("title", newAnnouncement.title);
     formData.set("text", newAnnouncement.text);
     formData.set("type", newAnnouncement.type);
+    formData.set("contestId", newAnnouncement.contestId);
     submit(formData, { method: "POST" });
     setDialogOpen(false);
-    setNewAnnouncement({ title: "", text: "", type: "info" });
+    setNewAnnouncement({ title: "", text: "", type: "info", contestId: "" });
   };
 
   const handleUpdate = () => {
@@ -244,6 +263,24 @@ export default function AdminAnnouncements({ loaderData }: Route.ComponentProps)
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="contest">Contest</Label>
+                <Select
+                  value={newAnnouncement.contestId}
+                  onValueChange={(value) => setNewAnnouncement({ ...newAnnouncement, contestId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select contest" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contests.map((contest) => (
+                      <SelectItem key={contest.contestId} value={contest.contestId}>
+                        {contest.contestName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="title">Title</Label>
@@ -399,6 +436,9 @@ export default function AdminAnnouncements({ loaderData }: Route.ComponentProps)
                       <div className="flex items-center gap-2 mt-1">
                         <Badge variant={config.badge as any} className="text-xs">
                           {config.label}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {announcement.contestName}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
                           by {announcement.author}

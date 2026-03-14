@@ -106,10 +106,16 @@ export async function requireContestAccess(
   contestId: string
 ): Promise<SessionData> {
   const session = await requireAuth(request);
+
+  // Admins have access to all contests
+  if (session.role === "admin") {
+    return session;
+  }
+
   const hasAccess = await canUserAccessContest(session.username, contestId);
 
   if (!hasAccess) {
-    throw new Response("Contest access denied", { status: 403 });
+    throw new Response(`User ${session.username} is not in contest ${contestId}`, { status: 403 });
   }
 
   return session;
@@ -124,6 +130,12 @@ export async function getUserWithContestContext(
 ): Promise<{ session: SessionData; contest: Contest | null }> {
   const session = await requireAuth(request);
   const contest = await getContest(contestId);
+
+  // Admins have access to all contests
+  if (session.role === "admin") {
+    return { session, contest };
+  }
+
   const hasAccess = await canUserAccessContest(session.username, contestId);
 
   return {

@@ -21,11 +21,11 @@ import {
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { StatusBadge } from "~/components/ui/status-badge";
-import { getUserContests } from "~/lib/db/contests.server";
 import type { UserContestView, ContestStatus, UserContestStatus } from "~/types/database";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { requireAuth } = await import("~/lib/auth.server");
+  const { getUserContests } = await import("~/lib/db/contests.server");
 
   const session = await requireAuth(request);
   const userContests = await getUserContests(session.username);

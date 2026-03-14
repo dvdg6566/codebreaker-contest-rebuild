@@ -73,16 +73,60 @@ export async function getClarificationsByUser(
 }
 
 /**
+ * Get clarifications for a specific contest
+ */
+export async function getClarificationsByContest(contestId: string): Promise<Clarification[]> {
+  const result = await docClient.send(
+    new ScanCommand({
+      TableName: TableNames.clarifications,
+      FilterExpression: "contestId = :contestId",
+      ExpressionAttributeValues: {
+        ":contestId": contestId,
+      },
+    })
+  );
+
+  const items = (result.Items || []) as Clarification[];
+  return items.sort((a, b) =>
+    b.clarificationTime.localeCompare(a.clarificationTime)
+  );
+}
+
+/**
+ * Get clarifications by user for a specific contest
+ */
+export async function getClarificationsByUserAndContest(
+  username: string,
+  contestId: string
+): Promise<Clarification[]> {
+  const result = await docClient.send(
+    new QueryCommand({
+      TableName: TableNames.clarifications,
+      KeyConditionExpression: "askedBy = :askedBy",
+      FilterExpression: "contestId = :contestId",
+      ExpressionAttributeValues: {
+        ":askedBy": username,
+        ":contestId": contestId,
+      },
+      ScanIndexForward: false,
+    })
+  );
+  return (result.Items || []) as Clarification[];
+}
+
+/**
  * Create a new clarification (ask a question)
  */
 export async function createClarification(
   askedBy: string,
   question: string,
+  contestId: string,
   problemName?: string
 ): Promise<Clarification> {
   const clarification: Clarification = {
     askedBy,
     clarificationTime: formatDateTime(new Date()),
+    contestId,
     problemName: problemName || "",
     question,
     answer: "",

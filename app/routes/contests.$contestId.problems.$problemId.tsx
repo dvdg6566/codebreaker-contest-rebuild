@@ -29,10 +29,6 @@ import {
 import { Textarea } from "~/components/ui/textarea";
 import { Separator } from "~/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { requireContestAccess } from "~/lib/auth.server";
-import { getContest, isUserInActiveContest } from "~/lib/contest.server";
-import { getProblem } from "~/lib/db/problems.server";
-import { getSubmissionsByUserAndProblem } from "~/lib/db/submissions.server";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { contestId, problemId } = params;
@@ -40,6 +36,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   if (!contestId || !problemId) {
     throw new Response("Contest ID and Problem ID required", { status: 400 });
   }
+
+  const { requireContestAccess } = await import("~/lib/auth.server");
+  const { getContest, isUserInActiveContest } = await import("~/lib/contest.server");
+  const { getProblem } = await import("~/lib/db/problems.server");
+  const { getSubmissionsByUserAndProblem } = await import("~/lib/db/submissions.server");
 
   const session = await requireContestAccess(request, contestId);
   const contest = await getContest(contestId);

@@ -28,10 +28,6 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { requireContestAccess } from "~/lib/auth.server";
-import { getContest } from "~/lib/contest.server";
-import { getSubmissionsByUser } from "~/lib/db/submissions.server";
-import { getProblem } from "~/lib/db/problems.server";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { contestId } = params;
@@ -39,6 +35,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   if (!contestId) {
     throw new Response("Contest ID required", { status: 400 });
   }
+
+  const { requireContestAccess } = await import("~/lib/auth.server");
+  const { getContest } = await import("~/lib/contest.server");
 
   const session = await requireContestAccess(request, contestId);
   const contest = await getContest(contestId);
@@ -49,6 +48,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   // Get submissions for this contest efficiently using GSI
   const { getSubmissionsByContestAndUser } = await import("~/lib/db/submissions.server");
+  const { getProblem } = await import("~/lib/db/problems.server");
   const contestSubmissions = await getSubmissionsByContestAndUser(contestId, session.username, 200);
 
   // Get problem details for title mapping

@@ -2,9 +2,7 @@ import type { Route } from "./+types/contests.$contestId.scoreboard";
 import { Link, useRevalidator } from "react-router";
 import { useEffect } from "react";
 import { Trophy, Medal, Award, Clock, Target } from "lucide-react";
-import { requireContestAccess } from "~/lib/auth.server";
-import { getContest } from "~/lib/contest.server";
-import { getScoreboard, type ScoreboardEntry } from "~/lib/db/scoreboard.server";
+import type { ScoreboardEntry } from "~/lib/db/scoreboard.server";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import {
@@ -24,7 +22,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   }
 
   const { requireAuth } = await import("~/lib/auth.server");
-  const { canUserAccessContest } = await import("~/lib/contest.server");
+  const { canUserAccessContest, getContest } = await import("~/lib/contest.server");
+  const { getScoreboard } = await import("~/lib/db/scoreboard.server");
 
   const session = await requireAuth(request);
   const contest = await getContest(contestId);

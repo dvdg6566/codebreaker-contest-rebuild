@@ -2,8 +2,6 @@ import type { Route } from "./+types/submissions";
 import { useState, useEffect } from "react";
 import { useFetcher } from "react-router";
 import { FileCode } from "lucide-react";
-import { listSubmissions, getSubmissionVerdict } from "~/lib/db/submissions.server";
-import { listProblems } from "~/lib/db/problems.server";
 import type { Problem } from "~/types/database";
 import {
   SubmissionManagementTable,
@@ -20,6 +18,9 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { requireAdmin } = await import("~/lib/auth.server");
+  const { listSubmissions, getSubmissionVerdict } = await import("~/lib/db/submissions.server");
+  const { listProblems } = await import("~/lib/db/problems.server");
+
   await requireAdmin(request);
 
   const cursor = new URL(request.url).searchParams.get("cursor") ?? undefined;

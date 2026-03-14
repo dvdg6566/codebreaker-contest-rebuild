@@ -40,6 +40,26 @@ export async function listAnnouncements(): Promise<Announcement[]> {
 }
 
 /**
+ * Get announcements for a specific contest (sorted by time, newest first)
+ */
+export async function getAnnouncementsByContest(contestId: string): Promise<Announcement[]> {
+  const result = await docClient.send(
+    new ScanCommand({
+      TableName: TableNames.announcements,
+      FilterExpression: "contestId = :contestId",
+      ExpressionAttributeValues: {
+        ":contestId": contestId,
+      },
+    })
+  );
+
+  const items = (result.Items || []) as Announcement[];
+  return items.sort((a, b) =>
+    b.announcementTime.localeCompare(a.announcementTime)
+  );
+}
+
+/**
  * Get an announcement by ID
  */
 export async function getAnnouncement(
@@ -60,11 +80,13 @@ export async function getAnnouncement(
 export async function createAnnouncement(
   title: string,
   text: string,
+  contestId: string,
   author?: string,
   priority?: "low" | "normal" | "high"
 ): Promise<Announcement> {
   const announcement: Announcement = {
     announcementId: generateAnnouncementId(),
+    contestId,
     title,
     text,
     announcementTime: formatDateTime(new Date()),

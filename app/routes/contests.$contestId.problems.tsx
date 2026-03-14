@@ -5,11 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { ScoreBadge } from "~/components/ui/score-badge";
-import { requireContestAccess } from "~/lib/auth.server";
-import { getContest } from "~/lib/contest.server";
-import { getUserContestScores } from "~/lib/db/users.server";
-import { getProblemsForContest } from "~/lib/db/problems.server";
-import { isUserInActiveContest } from "~/lib/contest.server";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { contestId } = params;
@@ -17,6 +12,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   if (!contestId) {
     throw new Response("Contest ID required", { status: 400 });
   }
+
+  const { requireContestAccess } = await import("~/lib/auth.server");
+  const { getContest, isUserInActiveContest } = await import("~/lib/contest.server");
+  const { getUserContestScores } = await import("~/lib/db/users.server");
+  const { getProblemsForContest } = await import("~/lib/db/problems.server");
 
   const session = await requireContestAccess(request, contestId);
   const contest = await getContest(contestId);
