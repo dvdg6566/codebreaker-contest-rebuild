@@ -61,11 +61,11 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <CardDescription className="mb-4">
-              Browse and solve programming problems.
+              Browse problems within your assigned contests.
             </CardDescription>
             <Button asChild variant="outline" size="sm">
-              <Link to="/problems">
-                View Problems
+              <Link to="/contests">
+                Browse Problems
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
@@ -79,10 +79,10 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <CardDescription className="mb-4">
-              View your submission history and results.
+              View your contest submissions and results.
             </CardDescription>
             <Button asChild variant="outline" size="sm">
-              <Link to="/submissions">
+              <Link to="/contests">
                 View Submissions
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
