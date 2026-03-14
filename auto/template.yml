@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Codebreaker Contest Manager - Main Stack
+
+Parameters:
+  JudgeName:
+    Description: "Insert name of Codebreaker Clone"
+    Type: String
+    Default: "codebreakercontest"
+
+Resources:
+  # Storage Stack - S3 Buckets
+  StorageStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/storage.yml
+      Parameters:
+        JudgeName: !Ref JudgeName
+
+  # Database Stack - DynamoDB Tables
+  DatabaseStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/database.yml
+      Parameters:
+        JudgeName: !Ref JudgeName
+
+  # Cognito Stack - User Authentication
+  CognitoStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/cognito.yml
+      Parameters:
+        JudgeName: !Ref JudgeName
+
+  # CodeBuild Stack: Lambda compiler backed by Docker container
+  CodeBuildStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/codebuild.yml
+      Parameters:
+        JudgeName: !Ref JudgeName
+
+  # Lambda Stack - All Lambda Functions
+  LambdasStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - StorageStack
+    Properties:
+      TemplateURL: templates/lambdas.yml
+      Parameters:
+        JudgeName: !Ref JudgeName
+        TestdataBucketArn: !GetAtt StorageStack.Outputs.TestdataBucketArn
+
+  # WebSocket Stack - API Gateway WebSocket
+  WebSocketStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - LambdasStack
+    Properties:
+      TemplateURL: templates/websocket.yml
+      Parameters:
+        JudgeName: !Ref JudgeName
+        WebSocketConnectionsFunctionArn: !GetAtt LambdasStack.Outputs.WebSocketConnectionsFunctionArn
+
+  # Step Functions Stack - State Machines
+  StepFunctionsStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - LambdasStack
+      - WebSocketStack
+    Properties:
+      TemplateURL: templates/step-functions.yml
+      Parameters:
+        JudgeName: !Ref JudgeName
+        GraderProblemInitFunctionArn: !GetAtt LambdasStack.Outputs.GraderProblemInitFunctionArn
+        TestcaseGraderWrapperFunctionArn: !GetAtt LambdasStack.Outputs.TestcaseGraderWrapperFunctionArn
+        GraderProblemScorerFunctionArn: !GetAtt LambdasStack.Outputs.GraderProblemScorerFunctionArn
+        WebSocketInvokeFunctionArn: !GetAtt WebSocketStack.Outputs.WebSocketInvokeFunctionArn
+
+Outputs:
+  GatewayEndpoint:
+    Description: WebSocket API Gateway endpoint
+    Value: !GetAtt WebSocketStack.Outputs.GatewayEndpoint
+  ECRURI:
+    Description: ECR URI for compiler image
+    Value: !GetAtt CodeBuildStack.Outputs.ECRURI
+  CognitoUserPoolId:
+    Description: Cognito User Pool ID
+    Value: !GetAtt CognitoStack.Outputs.UserPoolId
+  CognitoClientId:
+    Description: Cognito User Pool Client ID
+    Value: !GetAtt CognitoStack.Outputs.UserPoolClientId
+  TestdataUploadRoleArn:
+    Description: ARN of the testdata upload role for STS AssumeRole
+    Value: !GetAtt LambdasStack.Outputs.TestdataUploadRoleArn
+  CompilerFunctionArn:
+    Description: ARN of the Compiler Lambda function
+    Value: !GetAtt CodeBuildStack.Outputs.CompilerFunctionArn
