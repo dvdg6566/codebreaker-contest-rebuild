@@ -41,8 +41,10 @@ export function useCountdown(initialSeconds: number): number {
  * Format seconds into HH:MM:SS format
  */
 export function formatTime(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
+  // Ensure we work with integers to avoid floating point display issues
+  const totalSeconds = Math.floor(seconds);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }

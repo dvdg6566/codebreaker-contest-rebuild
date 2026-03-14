@@ -33,10 +33,13 @@ export async function getScoreboard(contestId: string): Promise<ScoreboardEntry[
   const contest = await getContest(contestId);
   if (!contest) return [];
 
-  // Get users who have started the contest
-  const users = Object.keys(contest.users || {}).filter(
-    (u) => contest.users?.[u] === "1"
-  );
+  // Get all users and find those who have started this contest
+  const allUsers = await listUsers();
+  const users = allUsers
+    .filter(user =>
+      user.activeContests?.[contestId]?.status === "started"
+    )
+    .map(user => user.username);
 
   // Get problem data
   const problemsData: Problem[] = [];
@@ -50,15 +53,16 @@ export async function getScoreboard(contestId: string): Promise<ScoreboardEntry[
 
   for (const username of users) {
     const user = await getUser(username);
-    const userScores = contest.scores?.[username] || {};
+    if (!user) continue;
+
+    // Get user's contest-specific scores
+    const userScores = user.contestScores?.[contestId] || {};
     const userSubmissions = await getSubmissionsByUser(username);
 
     const problems = contest.problems.map((problemName) => {
       const problem = problemsData.find((p) => p.problemName === problemName);
-      // userScores[problemName] is now an array of best subtask scores
-      const subtaskScores = userScores[problemName] || [];
-      // Calculate total score as sum of best subtask scores (IOI-style)
-      const score = calculateProblemScore(subtaskScores);
+      // userScores[problemName] is the total score for this problem
+      const score = userScores[problemName] || 0;
       const maxScore = problem ? getMaxScore(problem) : 100;
 
       const problemSubmissions = userSubmissions.filter(

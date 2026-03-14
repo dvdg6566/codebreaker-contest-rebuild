@@ -193,7 +193,39 @@ export async function isUserInActiveContest(
   const activeContests = await dbGetUserActiveContests(username);
   const userParticipation = activeContests[contestId];
 
-  if (!userParticipation || userParticipation.status !== "started") {
+  // Handle different user participation states
+  if (!userParticipation) {
+    return {
+      active: false,
+      contest,
+      participation: null,
+      timeRemaining: 0,
+      contestStart: null,
+      contestEnd: null,
+    };
+  }
+
+  // For invited users in centralized contests, they can view during ongoing status
+  if (userParticipation.status === "invited" && contest.mode === "centralized" && status === "ONGOING") {
+    const endTime = isDateTimeNotSet(contest.endTime)
+      ? new Date("9999-12-31")
+      : parseDateTime(contest.endTime);
+    const timeRemaining = Math.max(
+      0,
+      Math.floor((endTime.getTime() - now.getTime()) / 1000)
+    );
+    return {
+      active: true, // They can view the contest
+      contest,
+      participation: null,
+      timeRemaining,
+      contestStart: parseDateTime(contest.startTime),
+      contestEnd: isDateTimeNotSet(contest.endTime) ? null : parseDateTime(contest.endTime),
+    };
+  }
+
+  // For non-started users (invited but not started), return inactive
+  if (userParticipation.status !== "started") {
     return {
       active: false,
       contest,

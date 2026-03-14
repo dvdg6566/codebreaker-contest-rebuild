@@ -24,7 +24,38 @@ export function ContestProvider({
   initialContests = [],
   currentContestId
 }: ContestProviderProps) {
-  const [currentContest, setCurrentContest] = useState<Contest | null>(null);
+  // Smart initial contest selection to prevent loading flash
+  const getInitialContest = (): Contest | null => {
+    if (initialContests.length === 0) return null;
+
+    // 1. URL-based contest
+    if (currentContestId) {
+      return initialContests.find(c => c.contestId === currentContestId) || null;
+    }
+
+    // 2. Single contest - auto-select it
+    if (initialContests.length === 1) {
+      return initialContests[0];
+    }
+
+    // 3. Multiple contests - try localStorage
+    if (typeof window !== "undefined") {
+      const lastViewed = localStorage.getItem("lastViewedContest");
+      if (lastViewed) {
+        const contest = initialContests.find(c => c.contestId === lastViewed);
+        if (contest) return contest;
+      }
+    }
+
+    // 4. Fallback to most recent contest
+    const recentContest = initialContests
+      .filter(contest => contest.startTime !== "9999-12-31 23:59:59")
+      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())[0];
+
+    return recentContest || initialContests[0];
+  };
+
+  const [currentContest, setCurrentContest] = useState<Contest | null>(getInitialContest());
   const [availableContests, setAvailableContests] = useState<Contest[]>(initialContests);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -49,39 +80,38 @@ export function ContestProvider({
     }
   };
 
-  // Set current contest based on URL or smart default
+  // Update contest when contests change or URL changes
   useEffect(() => {
-    if (availableContests.length === 0) return;
-
-    let targetContest: Contest | null = null;
-
-    // 1. First priority: URL-based contest (if provided)
-    if (currentContestId) {
-      targetContest = availableContests.find(c => c.contestId === currentContestId) || null;
+    if (availableContests.length === 0) {
+      setCurrentContest(null);
+      return;
     }
 
-    // 2. Second priority: Last viewed contest (from localStorage)
-    if (!targetContest) {
-      const lastViewed = getLastViewedContest();
-      if (lastViewed) {
-        targetContest = availableContests.find(c => c.contestId === lastViewed) || null;
+    // If URL-based contest changes, update accordingly
+    if (currentContestId) {
+      const urlContest = availableContests.find(c => c.contestId === currentContestId);
+      if (urlContest && urlContest.contestId !== currentContest?.contestId) {
+        setCurrentContest(urlContest);
+        saveLastViewedContest(urlContest.contestId);
       }
     }
 
-    // 3. Third priority: Most recently active contest
-    if (!targetContest && availableContests.length > 0) {
-      // Find most recently started contest
-      targetContest = availableContests
-        .filter(contest => contest.startTime !== "9999-12-31 23:59:59")
-        .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())[0]
-        || availableContests[0];
+    // Ensure current contest is still in available contests
+    if (currentContest && !availableContests.find(c => c.contestId === currentContest.contestId)) {
+      const newContest = availableContests.length > 0 ? availableContests[0] : null;
+      setCurrentContest(newContest);
+      if (newContest) {
+        saveLastViewedContest(newContest.contestId);
+      }
     }
+  }, [availableContests, currentContestId]);
 
-    if (targetContest && targetContest.contestId !== currentContest?.contestId) {
-      setCurrentContest(targetContest);
-      saveLastViewedContest(targetContest.contestId);
+  // Save to localStorage when contest changes
+  useEffect(() => {
+    if (currentContest) {
+      saveLastViewedContest(currentContest.contestId);
     }
-  }, [availableContests, currentContestId, currentContest?.contestId]);
+  }, [currentContest?.contestId]);
 
   const contextValue: ContestContextType = {
     currentContest,

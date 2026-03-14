@@ -144,46 +144,40 @@ export default function ContestProblems({ loaderData }: Route.ComponentProps) {
           const isPartialSolved = problemScore > 0 && problemScore < maxProblemScore;
 
           return (
-            <Card key={problem.problemName} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-sm font-medium text-gray-700">
-                      {String.fromCharCode(65 + index)}
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-lg">{problem.title || problem.problemName}</h3>
-                        {isSolved && <CheckCircle2 className="h-5 w-5 text-emerald-600" />}
-                        {isPartialSolved && <div className="h-5 w-5 rounded-full bg-amber-400" />}
+            <Link key={problem.problemName} to={`/contests/${contest.contestId}/problems/${problem.problemName}`}>
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-sm font-medium text-gray-700">
+                        {String.fromCharCode(65 + index)}
                       </div>
 
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <span>Time: {problem.timeLimit}s</span>
-                        <span>Memory: {problem.memoryLimit}MB</span>
-                        <span>Max Score: {maxProblemScore}</span>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-lg">{problem.title || problem.problemName}</h3>
+                          {isSolved && <CheckCircle2 className="h-5 w-5 text-emerald-600" />}
+                          {isPartialSolved && <div className="h-5 w-5 rounded-full bg-amber-400" />}
+                        </div>
+
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <span>Time: {problem.timeLimit}s</span>
+                          <span>Memory: {problem.memoryLimit}MB</span>
+                          <span>Max Score: {maxProblemScore}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-3">
                     <div className="text-right">
                       <div className="text-sm text-gray-600">Your Score</div>
                       <div className="text-lg font-semibold">
                         {problemScore} / {maxProblemScore}
                       </div>
                     </div>
-
-                    <Link to={`/contests/${contest.contestId}/problems/${problem.problemName}`}>
-                      <Button>
-                        Solve
-                      </Button>
-                    </Link>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Link>
           );
         })}
       </div>

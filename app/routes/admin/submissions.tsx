@@ -56,7 +56,10 @@ export async function loader({ request }: Route.LoaderArgs) {
       verdict: getSubmissionVerdict(sub),
       score: sub.totalScore,
       maxScore,
-      time: sub.gradingCompleteTime
+      time: sub.gradingCompleteTime,
+      contestId: sub.contestId || "unknown",
+      contestDisplay: sub.contestId === "global" ? "Global/Admin" : (sub.contestId || "Unknown"),
+      time: sub.gradingCompleteTime && sub.maxTime
         ? (sub.maxTime / 1000).toFixed(2)
         : "N/A",
       submissionTime: sub.submissionTime,

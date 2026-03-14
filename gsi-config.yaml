@@ -1,0 +1,40 @@
+# Add this to your submissions table definition in CloudFormation/SAM template
+
+# For CloudFormation DynamoDB table:
+GlobalSecondaryIndexes:
+  - IndexName: contestIndex
+    KeySchema:
+      - AttributeName: contestId
+        KeyType: HASH
+      - AttributeName: submissionTime
+        KeyType: RANGE
+    Projection:
+      ProjectionType: ALL
+    ProvisionedThroughput:
+      ReadCapacityUnits: 5
+      WriteCapacityUnits: 5
+
+# Also add these to AttributeDefinitions (if not already present):
+AttributeDefinitions:
+  - AttributeName: contestId
+    AttributeType: S
+  - AttributeName: submissionTime
+    AttributeType: S
+
+---
+# Alternative: If using AWS CDK (Python/TypeScript), add:
+# table.add_global_secondary_index(
+#     index_name="contestIndex",
+#     partition_key=dynamodb.Attribute(name="contestId", type=dynamodb.AttributeType.STRING),
+#     sort_key=dynamodb.Attribute(name="submissionTime", type=dynamodb.AttributeType.STRING),
+#     projection_type=dynamodb.ProjectionType.ALL
+# )
+
+---
+# Alternative: If using Terraform:
+# global_secondary_index {
+#   name            = "contestIndex"
+#   hash_key        = "contestId"
+#   range_key       = "submissionTime"
+#   projection_type = "ALL"
+# }

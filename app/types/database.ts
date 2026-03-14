@@ -266,6 +266,8 @@ export interface Submission {
   username: string;
   /** Problem identifier */
   problemName: string;
+  /** Contest ID for contest submissions, "global" for admin submissions */
+  contestId: string;
   /** Submission time: "YYYY-MM-DD HH:MM:SS" */
   submissionTime: string;
   /** When grading started */

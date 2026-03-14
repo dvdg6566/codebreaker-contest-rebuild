@@ -1,5 +1,5 @@
 import type { Route } from "./+types/contests.$contestId.index";
-import { Link, redirect } from "react-router";
+import { Link, redirect, Form } from "react-router";
 import { Clock, Users, FileText, Calendar, Trophy, Timer, Play } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
@@ -27,8 +27,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // Check contest status for this user
   const contestStatus = await isUserInActiveContest(session.username, contestId);
 
-  // Get user's scores and problem count
-  const userScores = await getUserContestScores(session.username, contestId);
+  // Get user's scores and problem count (handle invited users safely)
+  const userScores = (await getUserContestScores(session.username, contestId)) || {};
   const problems = await getProblemsForContest(contest.problems);
 
   return {
@@ -40,7 +40,39 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   };
 }
 
-export default function ContestIndex({ loaderData }: Route.ComponentProps) {
+export async function action({ request, params }: Route.ActionArgs) {
+  const { contestId } = params;
+  if (!contestId) {
+    throw new Response("Contest ID required", { status: 400 });
+  }
+
+  const session = await requireContestAccess(request, contestId);
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent === "start-centralized-contest") {
+    const { updateUserContestStatus } = await import("~/lib/db/users.server");
+    const { formatDateTime } = await import("~/types/database");
+
+    try {
+      // Mark user as started for centralized contest
+      await updateUserContestStatus(session.username, contestId, {
+        status: "started",
+        startedAt: formatDateTime(new Date()),
+      });
+
+      return { success: true, message: "Contest started! You can now view problems and submit solutions." };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Failed to start contest"
+      };
+    }
+  }
+
+  return { error: "Invalid action" };
+}
+
+export default function ContestIndex({ loaderData, actionData }: Route.ComponentProps) {
   const { contest, contestStatus, userScores, problemCount, user } = loaderData;
 
   // Use countdown hook for real-time updates when contest is active
@@ -57,8 +89,8 @@ export default function ContestIndex({ loaderData }: Route.ComponentProps) {
     }
   };
 
-  const totalScore = Object.values(userScores).reduce((sum: number, score: number) => sum + score, 0);
-  const solvedProblems = Object.values(userScores).filter((score: number) => score > 0).length;
+  const totalScore = userScores ? Object.values(userScores).reduce((sum: number, score: number) => sum + score, 0) : 0;
+  const solvedProblems = userScores ? Object.values(userScores).filter((score: number) => score > 0).length : 0;
 
   // Determine contest status
   let statusBadgeColor = "bg-gray-100 text-gray-700";
@@ -70,6 +102,10 @@ export default function ContestIndex({ loaderData }: Route.ComponentProps) {
   } else if (contest.mode === "self-timer" && !contestStatus.participation) {
     statusBadgeColor = "bg-blue-100 text-blue-700";
     statusText = "Ready to Start";
+  } else if (contest.mode === "centralized" && contestStatus.contest?.contestId === contest.contestId) {
+    // Centralized contest that user is invited to but not actively participating
+    statusBadgeColor = "bg-blue-100 text-blue-700";
+    statusText = "Invited";
   } else {
     statusBadgeColor = "bg-amber-100 text-amber-700";
     statusText = "Waiting";
@@ -105,6 +141,23 @@ export default function ContestIndex({ loaderData }: Route.ComponentProps) {
           )}
         </div>
       </div>
+
+      {/* Action feedback */}
+      {actionData?.success && (
+        <div className="rounded-md bg-emerald-50 p-4 border border-emerald-200">
+          <div className="text-sm text-emerald-700">
+            {actionData.message}
+          </div>
+        </div>
+      )}
+
+      {actionData?.error && (
+        <div className="rounded-md bg-red-50 p-4 border border-red-200">
+          <div className="text-sm text-red-700">
+            {actionData.error}
+          </div>
+        </div>
+      )}
 
       {/* Contest Details */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -214,12 +267,26 @@ export default function ContestIndex({ loaderData }: Route.ComponentProps) {
 
       {/* Action Buttons */}
       <div className="flex gap-4">
-        <Link to={`/contests/${contest.contestId}/problems`}>
-          <Button size="lg">
-            <Play className="mr-2 h-5 w-5" />
-            View Problems
-          </Button>
-        </Link>
+        {/* Start Contest button for invited users in ongoing centralized contests */}
+        {!contestStatus.active && contest.mode === "centralized" && statusText === "Invited" && (
+          <Form method="post" className="inline">
+            <input type="hidden" name="intent" value="start-centralized-contest" />
+            <Button type="submit" size="lg">
+              <Play className="mr-2 h-5 w-5" />
+              Start Contest
+            </Button>
+          </Form>
+        )}
+
+        {/* View Problems button for active users */}
+        {contestStatus.active && (
+          <Link to={`/contests/${contest.contestId}/problems`}>
+            <Button size="lg">
+              <Play className="mr-2 h-5 w-5" />
+              View Problems
+            </Button>
+          </Link>
+        )}
 
         <Link to={`/contests/${contest.contestId}/submissions`}>
           <Button variant="outline" size="lg">
@@ -254,14 +321,14 @@ export default function ContestIndex({ loaderData }: Route.ComponentProps) {
       )}
 
       {!contestStatus.active && contest.mode === "centralized" && (
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-blue-200 bg-blue-50">
           <CardContent className="p-6">
             <div className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-amber-600" />
+              <Calendar className="h-5 w-5 text-blue-600" />
               <div>
-                <h3 className="font-medium text-amber-900">Centralized Contest</h3>
-                <p className="text-amber-700 mt-1">
-                  This contest runs on a fixed schedule for all participants. Check the start time above.
+                <h3 className="font-medium text-blue-900">Centralized Contest</h3>
+                <p className="text-blue-700 mt-1">
+                  You're invited to this contest. Click "Start Contest" above to begin participating and access the problems.
                 </p>
               </div>
             </div>

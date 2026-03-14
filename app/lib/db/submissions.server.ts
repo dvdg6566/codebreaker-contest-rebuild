@@ -92,6 +92,62 @@ export async function getSubmissionsByUser(
 }
 
 /**
+ * Get submissions by contest using the contest GSI
+ */
+export async function getSubmissionsByContest(
+  contestId: string,
+  limit = 100
+): Promise<Submission[]> {
+  const result = await docClient.send(
+    new QueryCommand({
+      TableName: TableNames.submissions,
+      IndexName: "contestIndex",
+      KeyConditionExpression: "contestId = :contestId",
+      ExpressionAttributeValues: {
+        ":contestId": contestId,
+      },
+      Limit: limit,
+      ScanIndexForward: false, // Sort by subId descending (newest submissions first)
+    })
+  );
+  return (result.Items || []) as Submission[];
+}
+
+/**
+ * Get submissions by contest and user using the contest GSI with filter
+ */
+export async function getSubmissionsByContestAndUser(
+  contestId: string,
+  username: string,
+  limit = 100
+): Promise<Submission[]> {
+  const result = await docClient.send(
+    new QueryCommand({
+      TableName: TableNames.submissions,
+      IndexName: "contestIndex",
+      KeyConditionExpression: "contestId = :contestId",
+      FilterExpression: "username = :username",
+      ExpressionAttributeValues: {
+        ":contestId": contestId,
+        ":username": username,
+      },
+      Limit: limit,
+      ScanIndexForward: false,
+    })
+  );
+  return (result.Items || []) as Submission[];
+}
+
+/**
+ * Get global/admin submissions (contestId = "global")
+ */
+export async function getGlobalSubmissions(
+  limit = 100
+): Promise<Submission[]> {
+  return getSubmissionsByContest("global", limit);
+}
+
+/**
  * Get submissions by problem
  */
 export async function getSubmissionsByProblem(
@@ -131,6 +187,7 @@ export async function createSubmission(
   username: string,
   problemName: string,
   language: string,
+  contestId: string,
   testcaseCount?: number
 ): Promise<Submission> {
   const subId = await getNextSubmissionId();
@@ -143,6 +200,7 @@ export async function createSubmission(
     subId,
     username,
     problemName,
+    contestId,
     language,
     submissionTime: now,
     gradingTime: now,
@@ -177,6 +235,7 @@ export async function createSubmissionWithSource(
   problemName: string,
   language: string,
   sourceCode: string,
+  contestId: string,
   testcaseCount?: number
 ): Promise<Submission> {
   // Create the submission record first
@@ -184,6 +243,7 @@ export async function createSubmissionWithSource(
     username,
     problemName,
     language,
+    contestId,
     testcaseCount
   );
 

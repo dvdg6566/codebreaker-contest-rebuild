@@ -21,8 +21,17 @@ export function ContestSelector({
   variant = "sidebar",
   showTimeRemaining = false
 }: ContestSelectorProps) {
-  const { currentContest, availableContests, switchContest } = useContestContext();
+  const { currentContest, availableContests, switchContest, isLoading } = useContestContext();
   const navigate = useNavigate();
+
+  // Show loading state to prevent flash
+  if (isLoading || (availableContests.length > 0 && !currentContest)) {
+    return (
+      <div className="px-3 py-2 text-center">
+        <p className="text-sm text-muted-foreground">Loading contests...</p>
+      </div>
+    );
+  }
 
   // Calculate time remaining for current contest
   const getTimeRemaining = (contest: typeof currentContest) => {

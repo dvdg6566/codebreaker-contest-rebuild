@@ -45,13 +45,16 @@ export function meta({ params }: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  const { requireAuth } = await import("~/lib/auth.server");
+  const { requireAuth, requireAdmin } = await import("~/lib/auth.server");
   const { getProblem } = await import("~/lib/db/problems.server");
   const { getSubmissionsByUserAndProblem, getSubmissionVerdict, getBestSubmission } = await import("~/lib/db/submissions.server");
   const { getStatementHtml, getAttachmentUrl } = await import("~/lib/s3.server");
   const { getLanguageOptions } = await import("~/lib/languages");
 
   const session = await requireAuth(request);
+
+  // Admin-only access for global problem testing
+  await requireAdmin(request);
 
   const problemName = params.problemId;
   const problem = await getProblem(problemName);
@@ -143,7 +146,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const { requireAuth } = await import("~/lib/auth.server");
+  const { requireAuth, requireAdmin } = await import("~/lib/auth.server");
+
+  // Admin-only access for global problem testing
+  await requireAdmin(request);
   const { getProblem } = await import("~/lib/db/problems.server");
   const { canUserSubmit } = await import("~/lib/db/submissions.server");
   const { submitForGrading } = await import("~/lib/grading.server");
@@ -206,18 +212,28 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { success: false, error: "Invalid language" };
   }
 
-  // Submit for grading
-  const result = await submitForGrading({
-    username: session.username,
-    problemName,
-    language,
-    code: problem.problem_type === "Communication" ? "" : code,
-    codeA: problem.problem_type === "Communication" ? codeA : undefined,
-    codeB: problem.problem_type === "Communication" ? codeB : undefined,
-  });
+  // Submit for grading (admin global submission)
+  const { submitSolution } = await import("~/lib/submissions.server");
 
-  if (!result.success) {
-    return { success: false, error: result.error };
+  try {
+    const submission = await submitSolution({
+      username: session.username,
+      problemName,
+      language,
+      code: problem.problem_type === "Communication" ? (codeA || code) : code,
+      // No contestId = global admin submission
+    });
+
+    return {
+      success: true,
+      submissionId: submission.subId,
+      message: `Submission #${submission.subId} queued for grading!`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to submit solution"
+    };
   }
 
   return { success: true, subId: result.subId };

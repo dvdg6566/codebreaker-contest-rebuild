@@ -19,6 +19,8 @@ export interface SubmissionRow {
   maxScore: number;
   time: string;
   submissionTime: string;
+  contestId: string;
+  contestDisplay: string;
 }
 
 const submissionColumns: ColumnDef<SubmissionRow>[] = [
@@ -73,6 +75,17 @@ const submissionColumns: ColumnDef<SubmissionRow>[] = [
         </Link>
       );
     },
+  },
+  {
+    accessorKey: "contestDisplay",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Contest" />
+    ),
+    cell: ({ row }) => (
+      <Badge variant={row.original.contestId === "global" ? "secondary" : "outline"} className="text-xs">
+        {row.getValue("contestDisplay")}
+      </Badge>
+    ),
   },
   {
     accessorKey: "languageDisplay",

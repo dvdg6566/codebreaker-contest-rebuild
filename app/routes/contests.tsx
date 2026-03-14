@@ -39,6 +39,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 export async function action({ request }: Route.ActionArgs) {
   const { requireAuth } = await import("~/lib/auth.server");
   const { startUserContest } = await import("~/lib/contest.server");
+  const { getUserContests } = await import("~/lib/db/contests.server");
 
   const session = await requireAuth(request);
   const formData = await request.formData();
@@ -61,6 +62,50 @@ export async function action({ request }: Route.ActionArgs) {
     try {
       await startUserContest(session.username, contestId);
       return { success: true, message: "Contest started successfully!" };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Failed to start contest"
+      };
+    }
+  }
+
+  if (intent === "start_centralized_contest" && contestId) {
+    // SECURITY: Double-check user has access to this contest
+    const userContests = await getUserContests(session.username);
+    const allowedContest = userContests.find(c =>
+      c.contestId === contestId &&
+      c.status === "ONGOING" &&
+      c.mode === "centralized" &&
+      c.userStatus === "invited"
+    );
+
+    if (!allowedContest) {
+      return {
+        error: "Access denied: You cannot start this contest"
+      };
+    }
+
+    try {
+      const { updateUserContestStatus } = await import("~/lib/db/users.server");
+      const { updateContest } = await import("~/lib/db/contests.server");
+      const { formatDateTime } = await import("~/types/database");
+      const { getContest } = await import("~/lib/contest.server");
+
+      // Mark user as started for centralized contest (new system)
+      await updateUserContestStatus(session.username, contestId, {
+        status: "started",
+        startedAt: formatDateTime(new Date()),
+      });
+
+      // Also update the contest's user list (old system compatibility)
+      const contest = await getContest(contestId);
+      if (contest) {
+        await updateContest(contestId, {
+          users: { ...contest.users, [session.username]: "1" },
+        });
+      }
+
+      return { success: true, message: "Contest started! You can now access problems and submit solutions." };
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : "Failed to start contest"
@@ -194,17 +239,37 @@ export default function Contests({ loaderData, actionData }: Route.ComponentProp
 }
 
 function ContestCard({ contest }: { contest: UserContestView }) {
-  const statusColors: Record<ContestStatus, string> = {
-    NOT_STARTED: "bg-amber-100 text-amber-700",
-    ONGOING: "bg-emerald-100 text-emerald-700",
-    ENDED: "bg-gray-100 text-gray-700",
+  // Determine the primary status to show (avoid redundancy)
+  const getContestStatusBadge = () => {
+    // For ended contests, show completion status instead of "ENDED"
+    if (contest.status === "ENDED") {
+      return {
+        text: contest.userStatus === "completed" ? "Completed" : "Ended",
+        className: contest.userStatus === "completed"
+          ? "bg-emerald-100 text-emerald-700"
+          : "bg-gray-100 text-gray-700"
+      };
+    }
+
+    // For ongoing contests, show user participation status
+    if (contest.status === "ONGOING") {
+      if (contest.userStatus === "started") {
+        return { text: "Active", className: "bg-emerald-100 text-emerald-700" };
+      } else if (contest.userStatus === "invited") {
+        return { text: contest.canStart ? "Ready to Start" : "Invited", className: "bg-blue-100 text-blue-700" };
+      }
+    }
+
+    // For not started contests
+    if (contest.status === "NOT_STARTED") {
+      return { text: "Upcoming", className: "bg-amber-100 text-amber-700" };
+    }
+
+    // Fallback
+    return { text: contest.status.replace("_", " "), className: "bg-gray-100 text-gray-700" };
   };
 
-  const userStatusColors: Record<UserContestStatus, string> = {
-    invited: "bg-blue-100 text-blue-700",
-    started: "bg-emerald-100 text-emerald-700",
-    completed: "bg-gray-100 text-gray-700",
-  };
+  const statusBadge = getContestStatusBadge();
 
   return (
     <Card className="w-full">
@@ -224,11 +289,8 @@ function ContestCard({ contest }: { contest: UserContestView }) {
             )}
           </div>
           <div className="flex flex-col gap-2">
-            <Badge className={statusColors[contest.status]}>
-              {contest.status.replace("_", " ")}
-            </Badge>
-            <Badge className={userStatusColors[contest.userStatus]} variant="outline">
-              {contest.userStatus}
+            <Badge className={statusBadge.className}>
+              {statusBadge.text}
             </Badge>
           </div>
         </div>
@@ -308,6 +370,20 @@ function ContestCard({ contest }: { contest: UserContestView }) {
             </Form>
           )}
 
+          {/* Start button for invited users in ongoing centralized contests */}
+          {contest.status === "ONGOING" &&
+           contest.mode === "centralized" &&
+           contest.userStatus === "invited" && (
+            <Form method="post" className="inline">
+              <input type="hidden" name="intent" value="start_centralized_contest" />
+              <input type="hidden" name="contestId" value={contest.contestId} />
+              <Button type="submit">
+                <Play className="mr-2 h-4 w-4" />
+                Start Contest
+              </Button>
+            </Form>
+          )}
+
           {contest.status === "ONGOING" && (
             <Button asChild variant="outline">
               <Link to={`/contests/${contest.contestId}/scoreboard`}>
@@ -317,7 +393,9 @@ function ContestCard({ contest }: { contest: UserContestView }) {
             </Button>
           )}
 
-          {(contest.status === "ONGOING" || contest.status === "ENDED") && (
+          {/* View Details - hide when showing Start Contest button */}
+          {(contest.status === "ONGOING" || contest.status === "ENDED") &&
+           !(contest.status === "ONGOING" && contest.mode === "centralized" && contest.userStatus === "invited") && (
             <Button asChild variant="ghost">
               <Link to={`/contests/${contest.contestId}`}>
                 <Eye className="mr-2 h-4 w-4" />
