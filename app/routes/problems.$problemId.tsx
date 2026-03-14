@@ -125,7 +125,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       title: problem.title,
       author: "admin", // Not stored in DB
       source: problem.source || "",
-      difficulty: problem.difficulty || "",
       timeLimit: problem.timeLimit,
       memoryLimit: problem.memoryLimit,
       score: userScore,
@@ -299,12 +298,6 @@ export default function ProblemDetail({ loaderData, actionData }: Route.Componen
               <h1 className="text-2xl font-bold tracking-tight">
                 {problemData.title}
               </h1>
-              <Badge
-                variant="outline"
-                className="bg-amber-100 text-amber-700"
-              >
-                {problemData.difficulty}
-              </Badge>
               {problemData.type === "Communication" && (
                 <Badge variant="secondary">Communication</Badge>
               )}

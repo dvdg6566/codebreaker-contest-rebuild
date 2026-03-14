@@ -90,7 +90,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const allProblems = problems.map((p) => ({
     problemName: p.problemName,
     title: p.title,
-    difficulty: p.difficulty,
   }));
 
   // Get all users for adding to contest
@@ -259,7 +258,7 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
   // Get problem details for the contest
   const contestProblems = contest.problems.map((problemName) => {
     const problem = allProblems.find((p) => p.problemName === problemName);
-    return problem || { problemName, title: "Unknown", difficulty: "easy" as const };
+    return problem || { problemName, title: "Unknown" };
   });
 
   // Get available problems (not already in contest)
@@ -613,12 +612,7 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
                       ) : (
                         availableProblems.map((problem) => (
                           <SelectItem key={problem.problemName} value={problem.problemName}>
-                            <div className="flex items-center gap-2">
-                              <span>{problem.title}</span>
-                              <Badge variant="outline" className="text-xs">
-                                {problem.difficulty}
-                              </Badge>
-                            </div>
+                            {problem.title}
                           </SelectItem>
                         ))
                       )}
@@ -655,7 +649,6 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
                       <TableRow>
                         <TableHead className="w-[50px]">#</TableHead>
                         <TableHead>Problem</TableHead>
-                        <TableHead>Difficulty</TableHead>
                         <TableHead className="w-[100px]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -677,18 +670,6 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
                             >
                               {problem.title}
                             </Link>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                problem.difficulty === "easy" && "text-emerald-600 border-emerald-200 bg-emerald-50",
-                                problem.difficulty === "medium" && "text-amber-600 border-amber-200 bg-amber-50",
-                                problem.difficulty === "hard" && "text-red-600 border-red-200 bg-red-50"
-                              )}
-                            >
-                              {problem.difficulty}
-                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Form method="post">

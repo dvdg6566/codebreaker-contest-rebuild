@@ -204,8 +204,6 @@ export interface Problem {
   // Extended fields (not in reference DynamoDB)
   /** Problem source/origin */
   source?: string;
-  /** Difficulty level for UI display */
-  difficulty?: "easy" | "medium" | "hard";
   /** Tags for categorization */
   tags?: string[];
 
