@@ -117,6 +117,45 @@ Resources:
                   - !Sub '${TestdataBucketArn}/*'
       PermissionsBoundary: 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
 
+  # Contest End Notifier - Invoked by EventBridge Scheduler to notify users when contest ends
+  ContestEndNotifierFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Lambda function to notify users when contest ends via WebSocket
+      FunctionName: !Sub ${JudgeName}-contest-end-notifier
+      CodeUri: ../lambda-functions/contest-end-notifier
+      Policies:
+        - AmazonDynamoDBReadOnlyAccess
+        - AWSStepFunctionsFullAccess
+
+  # IAM Role for EventBridge Scheduler to invoke the contest-end-notifier Lambda
+  ContestEndSchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${JudgeName}-contest-end-scheduler-role
+      Description: Role for EventBridge Scheduler to invoke contest end notifier Lambda
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeContestEndNotifier
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt ContestEndNotifierFunction.Arn
+
+  # Schedule Group to organize all contest-end schedules
+  ContestEndScheduleGroup:
+    Type: AWS::Scheduler::ScheduleGroup
+    Properties:
+      Name: !Sub ${JudgeName}-contest-end
+
 Outputs:
   WebSocketConnectionsFunctionArn:
     Value: !GetAtt WebSocketConnectionsFunction.Arn
@@ -126,6 +165,3 @@ Outputs:
     Value: !GetAtt GraderProblemScorerFunction.Arn
   TestcaseGraderWrapperFunctionArn:
     Value: !GetAtt TestcaseGraderWrapperFunction.Arn
-  TestdataUploadRoleArn:
-    Description: ARN of the testdata upload role for STS AssumeRole
-    Value: !GetAtt TestdataUploadRole.Arn

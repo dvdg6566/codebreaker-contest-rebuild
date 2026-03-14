@@ -15,12 +15,12 @@ def lambda_handler(event, context):
         # Disconnect: Remove connection entry from dynamo DB
         awstools.removeConnection(connectionId = connectionId)
     else:
-        # Supplying username and account role
+        # Supplying username, account role, and optionally contestId
         body = json.loads(event['body'])
         username = body['username']
         accountRole = body['accountRole']
-        awstools.updateUserDetails(connectionId = connectionId, username = username, accountRole = accountRole)
-        # print(f'Subscribing for {username} with role {accountRole}')
+        contestId = body.get('contestId', '')
+        awstools.updateUserDetails(connectionId=connectionId, username=username, accountRole=accountRole, contestId=contestId)
         
     return {
         'statusCode': 200,

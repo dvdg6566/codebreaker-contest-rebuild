@@ -145,5 +145,3 @@ Outputs:
     Value: !GetAtt CompilerFunctionIAMRole.Arn
   CodeBuildProjectName:
     Value: !Ref CodeBuildProject
-  CompilerFunctionArn:
-    Value: !GetAtt CodeBuildTrigger.CompilerFunctionArn

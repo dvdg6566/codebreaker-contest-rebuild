@@ -8,3 +8,6 @@
 
 # Generated test data
 /testdata/
+
+# AWS SAM build artifacts
+.aws-sam/

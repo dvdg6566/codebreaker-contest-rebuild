@@ -91,9 +91,3 @@ Outputs:
   CognitoClientId:
     Description: Cognito User Pool Client ID
     Value: !GetAtt CognitoStack.Outputs.UserPoolClientId
-  TestdataUploadRoleArn:
-    Description: ARN of the testdata upload role for STS AssumeRole
-    Value: !GetAtt LambdasStack.Outputs.TestdataUploadRoleArn
-  CompilerFunctionArn:
-    Description: ARN of the Compiler Lambda function
-    Value: !GetAtt CodeBuildStack.Outputs.CompilerFunctionArn
