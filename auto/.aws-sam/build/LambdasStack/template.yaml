@@ -91,17 +91,6 @@ Resources:
       - AWSLambdaRole
     Metadata:
       SamResourceId: TestcaseGraderWrapperFunction
-  PsUtilLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      LayerName:
-        Fn::Sub: ${JudgeName}-psutil
-      Description: Lambda layer for testcase grading for PSutil library
-      ContentUri: ../../../lambda-functions/psutil
-      CompatibleRuntimes:
-      - python3.14
-      CompatibleArchitectures:
-      - x86_64
   TestcaseGraderFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -112,8 +101,6 @@ Resources:
       CodeUri: TestcaseGraderFunction
       Policies:
       - AmazonS3ReadOnlyAccess
-      Layers:
-      - Ref: PsUtilLayer
     Metadata:
       SamResourceId: TestcaseGraderFunction
   TestdataUploadRole:

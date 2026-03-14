@@ -79,17 +79,6 @@ Resources:
         - AmazonDynamoDBFullAccess
         - AWSLambdaRole
 
-  PsUtilLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      LayerName: !Sub ${JudgeName}-psutil
-      Description: Lambda layer for testcase grading for PSutil library
-      ContentUri: ../lambda-functions/psutil
-      CompatibleRuntimes:
-        - python3.14
-      CompatibleArchitectures:
-        - x86_64
-
   TestcaseGraderFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -99,8 +88,6 @@ Resources:
       CodeUri: ../lambda-functions/testcase-grader
       Policies:
         - AmazonS3ReadOnlyAccess
-      Layers:
-        - !Ref PsUtilLayer
 
   TestdataUploadRole:
     Type: AWS::IAM::Role
