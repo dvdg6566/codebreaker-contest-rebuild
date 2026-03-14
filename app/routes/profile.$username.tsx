@@ -35,6 +35,20 @@ import {
 } from "~/components/ui/table";
 import { getInitials } from "~/lib/utils";
 
+// Helper to consolidate problem scores from all contests
+function getAllProblemScores(contestScores: Record<string, Record<string, number>>): Record<string, number> {
+  const allScores: Record<string, number> = {};
+
+  // For each contest, get the best score for each problem
+  Object.values(contestScores).forEach(contestProblems => {
+    Object.entries(contestProblems).forEach(([problemName, score]) => {
+      allScores[problemName] = Math.max(allScores[problemName] || 0, score);
+    });
+  });
+
+  return allScores;
+}
+
 export function meta({ params }: Route.MetaArgs) {
   return [
     { title: `${params.username}'s Profile - Codebreaker Contest` },
@@ -61,18 +75,29 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // Get all submissions for this user
   const submissions = await getSubmissionsByUser(username, 1000);
 
-  // Get contest info if assigned
+  // Get user's active contests
+  const { getUserActiveContests } = await import("~/lib/db/users.server");
+  const activeContests = await getUserActiveContests(username);
+  const contestNames = Object.keys(activeContests);
+
+  // Get contest details if user has contests
   let contestName = null;
-  if (user.contest) {
-    const contest = await getContest(user.contest);
-    contestName = contest?.contestName || user.contest;
+  if (contestNames.length > 0) {
+    const contests = await Promise.all(
+      contestNames.map(id => getContest(id))
+    );
+    contestName = contests.filter((c): c is NonNullable<typeof c> => c !== null).map(c => c.contestName).join(", ");
   }
 
   // Calculate stats
   const totalSubmissions = submissions.length;
   const completedSubmissions = submissions.filter((s) => s.status?.slice(1).every((st) => st === 2) ?? false);
   const acceptedSubmissions = completedSubmissions.filter((s) => s.totalScore === 100).length;
-  const problemsSolved = Object.values(user.problemScores || {}).filter((score) => score === 100).length;
+
+  // Calculate problems solved across all contests
+  const problemsSolved = Object.values(user.contestScores || {})
+    .flatMap(contestScores => Object.values(contestScores))
+    .filter((score) => score === 100).length;
 
   // Get recent submissions (last 10)
   const recentSubmissionData = submissions.slice(0, 10);
@@ -111,14 +136,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       role: user.role,
       joinedDate: "", // Not tracked in current schema
       contest: contestName,
-      contestId: user.contest || null,
+      contestId: contestNames[0] || null, // Primary contest
       stats: {
         totalSubmissions,
         acceptedSubmissions,
         problemsSolved,
-        contestsParticipated: 1, // For contest mode, always 1
+        contestsParticipated: contestNames.length,
       },
-      problemScores: user.problemScores || {},
+      problemScores: getAllProblemScores(user.contestScores || {}),
     },
     recentSubmissions,
     isCurrentUser,

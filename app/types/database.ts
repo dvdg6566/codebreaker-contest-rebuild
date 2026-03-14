@@ -14,6 +14,22 @@
 export type UserRole = "admin" | "member";
 
 /**
+ * Contest participation status and metadata
+ */
+export interface ContestParticipation {
+  /** Participation status */
+  status: "invited" | "started" | "completed";
+  /** When user was added to contest */
+  joinedAt: string;
+  /** When user started (for self-timer mode) */
+  startedAt?: string;
+  /** When contest ended for user */
+  completedAt?: string;
+  /** Final score achieved */
+  finalScore?: number;
+}
+
+/**
  * User account stored in DynamoDB
  * PK: username
  */
@@ -28,16 +44,15 @@ export interface User {
   email: string;
   /** Custom label/tag for categorization */
   label: string;
-  /** Currently assigned contest ID */
-  contest: string;
-  /** Best scores per problem: { problemName: score } */
-  problemScores: Record<string, number>;
-  /** Submission counts per problem: { problemName: count } */
-  problemSubmissions: Record<string, number>;
-  /** Latest submission timestamps per problem: { problemName: "YYYY-MM-DD HH:MM:SS" } */
-  latestSubmissions: Record<string, string>;
-  /** Timestamp of last score change */
-  latestScoreChange: string;
+
+  /** Multiple contest participation */
+  activeContests: Record<string, ContestParticipation>;
+  /** Contest-specific problem scores: { contestId: { problemName: score } } */
+  contestScores: Record<string, Record<string, number>>;
+  /** Contest-specific submission counts: { contestId: { problemName: count } } */
+  contestSubmissions: Record<string, Record<string, number>>;
+  /** Contest-specific latest submissions: { contestId: { problemName: timestamp } } */
+  contestLatestSubmissions: Record<string, Record<string, string>>;
 }
 
 /** Default values for new users */
@@ -45,11 +60,10 @@ export const DEFAULT_USER: Omit<User, "username" | "role"> = {
   fullname: "",
   email: "",
   label: "",
-  contest: "",
-  problemScores: {},
-  problemSubmissions: {},
-  latestSubmissions: {},
-  latestScoreChange: "",
+  activeContests: {},
+  contestScores: {},
+  contestSubmissions: {},
+  contestLatestSubmissions: {},
 };
 
 // =============================================================================

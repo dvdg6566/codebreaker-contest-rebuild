@@ -490,31 +490,36 @@ export async function updateScoresAfterGrading(
   const { updateContestScore, calculateProblemScore } = await import(
     "./contests.server"
   );
-  const { updateUserScore } = await import("./users.server");
-  const { getUser } = await import("./users.server");
+  const { updateUserContestScore, getUserActiveContests } = await import("./users.server");
 
-  // Get user to find their contest
-  const user = await getUser(submission.username);
-  if (!user) return;
+  // Get user's active contests to determine which contest this submission belongs to
+  const activeContests = await getUserActiveContests(submission.username);
+  if (Object.keys(activeContests).length === 0) return;
 
   // Calculate total score from subtask scores
   const totalScore = calculateProblemScore(submission.subtaskScores);
 
-  // Update user's problem score (stores total)
-  await updateUserScore(
-    submission.username,
-    submission.problemName,
-    totalScore,
-    submission.submissionTime
-  );
+  // Update scores for all active contests (user might be in multiple contests)
+  for (const contestId of Object.keys(activeContests)) {
+    try {
+      // Update user's contest-specific score
+      await updateUserContestScore(
+        submission.username,
+        contestId,
+        submission.problemName,
+        totalScore,
+        submission.submissionTime
+      );
 
-  // Update contest scores (stores subtask bests for IOI-style scoring)
-  if (user.contest) {
-    await updateContestScore(
-      user.contest,
-      submission.username,
-      submission.problemName,
-      submission.subtaskScores
-    );
+      // Update contest scores (stores subtask bests for IOI-style scoring)
+      await updateContestScore(
+        contestId,
+        submission.username,
+        submission.problemName,
+        submission.subtaskScores
+      );
+    } catch (error) {
+      console.error(`Failed to update scores for contest ${contestId}:`, error);
+    }
   }
 }

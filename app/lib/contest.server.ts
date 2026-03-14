@@ -3,13 +3,16 @@
  */
 
 import type { Contest, ContestMode, ContestStatus } from "~/types/database";
-import { parseDateTime, isDateTimeNotSet } from "~/types/database";
+import { parseDateTime, isDateTimeNotSet, formatDateTime } from "~/types/database";
 import {
   getContest as dbGetContest,
   getContestStatus,
   updateContest as dbUpdateContest,
 } from "./db/index.server";
-import { getUser } from "./db/index.server";
+import {
+  getUserActiveContests as dbGetUserActiveContests,
+  canUserAccessContest as dbCanUserAccessContest,
+} from "./db/index.server";
 
 // Re-export types
 export type { ContestMode, ContestStatus };
@@ -26,35 +29,6 @@ export interface UserParticipation {
 const userParticipations: Map<string, UserParticipation> = new Map();
 
 /**
- * Get the contest assigned to a user
- */
-export async function getUserAssignedContest(username: string): Promise<Contest | null> {
-  const user = await getUser(username);
-  if (!user?.contest) return null;
-  return dbGetContest(user.contest);
-}
-
-/**
- * Get the current active contest for a user (if any)
- */
-export async function getActiveContest(username: string): Promise<Contest | null> {
-  const contest = await getUserAssignedContest(username);
-  if (!contest) return null;
-
-  const status = getContestStatus(contest);
-  if (status === "ONGOING") {
-    return contest;
-  }
-
-  // For self-timer mode, also return the contest if it's within the window
-  if (contest.mode === "self-timer" && status !== "ENDED") {
-    return contest;
-  }
-
-  return null;
-}
-
-/**
  * Get a specific contest by ID
  */
 export async function getContest(contestId: string): Promise<Contest | null> {
@@ -62,7 +36,7 @@ export async function getContest(contestId: string): Promise<Contest | null> {
 }
 
 /**
- * Get user's participation in a contest
+ * Get user's participation in a contest (in-memory tracking for self-timer)
  */
 export function getUserParticipation(
   username: string,
@@ -72,8 +46,36 @@ export function getUserParticipation(
   return userParticipations.get(key) || null;
 }
 
+// =============================================================================
+// MULTI-CONTEST FUNCTIONS
+// =============================================================================
+
 /**
- * Start a user's contest (for self-timer mode)
+ * Get all active contests for a user
+ */
+export async function getUserActiveContests(username: string): Promise<Contest[]> {
+  const activeContests = await dbGetUserActiveContests(username);
+  const contestIds = Object.keys(activeContests);
+
+  const contests = await Promise.all(
+    contestIds.map(contestId => dbGetContest(contestId))
+  );
+
+  return contests.filter(Boolean) as Contest[];
+}
+
+/**
+ * Check if user can access specific contest
+ */
+export async function canUserAccessContest(
+  username: string,
+  contestId: string
+): Promise<boolean> {
+  return dbCanUserAccessContest(username, contestId);
+}
+
+/**
+ * Start user's contest (for self-timer mode)
  */
 export async function startUserContest(
   username: string,
@@ -84,14 +86,21 @@ export async function startUserContest(
     throw new Error("Contest not found");
   }
 
-  // SECURITY: Verify user has access to this contest
-  const userInContest = contest.users?.[username];
-  if (!userInContest) {
+  // Check user has access to this contest
+  const hasAccess = await canUserAccessContest(username, contestId);
+  if (!hasAccess) {
     throw new Error("Access denied: You are not assigned to this contest");
   }
 
-  // SECURITY: Verify user hasn't already started (only invited users can start)
-  if (userInContest && userInContest !== "0") {
+  // Get user's current participation in this contest
+  const activeContests = await dbGetUserActiveContests(username);
+  const participation = activeContests[contestId];
+
+  if (!participation) {
+    throw new Error("You are not assigned to this contest");
+  }
+
+  if (participation.status !== "invited") {
     throw new Error("You have already started this contest");
   }
 
@@ -110,36 +119,42 @@ export async function startUserContest(
     throw new Error("Contest has ended");
   }
 
-  const key = `${username}:${contestId}`;
-  const existing = userParticipations.get(key);
-  if (existing?.startedAt) {
-    throw new Error("You have already started this contest");
-  }
-
   const duration = contest.duration || 180;
-  const participation: UserParticipation = {
+  const userParticipation: UserParticipation = {
     username,
     contestId,
     startedAt: now,
     endsAt: new Date(now.getTime() + duration * 60 * 1000),
   };
 
-  userParticipations.set(key, participation);
+  // Update user's contest status to started
+  const { updateUserContestStatus } = await import("./db/index.server");
+  await updateUserContestStatus(username, contestId, {
+    status: "started",
+    startedAt: formatDateTime(now),
+  });
 
-  // Also mark the user as started in the contest
+  // Also mark user as started in the contest
   if (contest.users?.[username] === "0") {
     await dbUpdateContest(contestId, {
       users: { ...contest.users, [username]: "1" },
     });
   }
 
-  return participation;
+  // Store participation in memory (existing pattern)
+  const key = `${username}:${contestId}`;
+  userParticipations.set(key, userParticipation);
+
+  return userParticipation;
 }
 
 /**
- * Check if a user is currently in an active contest session
+ * Check if user is in an active contest session for specific contest
  */
-export async function isUserInActiveContest(username: string): Promise<{
+export async function isUserInActiveContest(
+  username: string,
+  contestId: string
+): Promise<{
   active: boolean;
   contest: Contest | null;
   participation: UserParticipation | null;
@@ -148,8 +163,21 @@ export async function isUserInActiveContest(username: string): Promise<{
   contestEnd: Date | null;
 }> {
   const now = new Date();
-  const contest = await getUserAssignedContest(username);
 
+  // Check if user has access to this contest
+  const hasAccess = await canUserAccessContest(username, contestId);
+  if (!hasAccess) {
+    return {
+      active: false,
+      contest: null,
+      participation: null,
+      timeRemaining: 0,
+      contestStart: null,
+      contestEnd: null,
+    };
+  }
+
+  const contest = await dbGetContest(contestId);
   if (!contest) {
     return {
       active: false,
@@ -162,6 +190,19 @@ export async function isUserInActiveContest(username: string): Promise<{
   }
 
   const status = getContestStatus(contest);
+  const activeContests = await dbGetUserActiveContests(username);
+  const userParticipation = activeContests[contestId];
+
+  if (!userParticipation || userParticipation.status !== "started") {
+    return {
+      active: false,
+      contest,
+      participation: null,
+      timeRemaining: 0,
+      contestStart: null,
+      contestEnd: null,
+    };
+  }
 
   if (contest.mode === "centralized") {
     if (status === "ONGOING") {
@@ -183,59 +224,46 @@ export async function isUserInActiveContest(username: string): Promise<{
           : parseDateTime(contest.endTime),
       };
     }
-    return {
-      active: false,
-      contest,
-      participation: null,
-      timeRemaining: 0,
-      contestStart: null,
-      contestEnd: null,
-    };
   } else {
-    // Self-timer mode
-    const participation = getUserParticipation(username, contest.contestId);
+    // Self-timer mode - check in-memory participation
+    const memoryParticipation = getUserParticipation(username, contestId);
 
-    if (participation?.startedAt && participation.endsAt) {
-      if (now <= participation.endsAt) {
+    if (memoryParticipation?.startedAt && memoryParticipation.endsAt) {
+      if (now <= memoryParticipation.endsAt) {
         const timeRemaining = Math.max(
           0,
-          Math.floor((participation.endsAt.getTime() - now.getTime()) / 1000)
+          Math.floor((memoryParticipation.endsAt.getTime() - now.getTime()) / 1000)
         );
         return {
           active: true,
           contest,
-          participation,
+          participation: memoryParticipation,
           timeRemaining,
-          contestStart: participation.startedAt,
-          contestEnd: participation.endsAt,
+          contestStart: memoryParticipation.startedAt,
+          contestEnd: memoryParticipation.endsAt,
         };
       }
-      return {
-        active: false,
-        contest,
-        participation,
-        timeRemaining: 0,
-        contestStart: null,
-        contestEnd: null,
-      };
-    } else {
-      return {
-        active: false,
-        contest,
-        participation: null,
-        timeRemaining: 0,
-        contestStart: null,
-        contestEnd: null,
-      };
     }
   }
+
+  return {
+    active: false,
+    contest,
+    participation: null,
+    timeRemaining: 0,
+    contestStart: null,
+    contestEnd: null,
+  };
 }
 
 /**
- * Get contest problems (only if user is in active contest)
+ * Get contest problems for a specific contest (if user has access)
  */
-export async function getContestProblems(username: string): Promise<string[]> {
-  const status = await isUserInActiveContest(username);
+export async function getContestProblems(
+  username: string,
+  contestId: string
+): Promise<string[]> {
+  const status = await isUserInActiveContest(username, contestId);
   if (!status.active || !status.contest) {
     return [];
   }

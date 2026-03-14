@@ -47,13 +47,19 @@ export default [
 
     // Contest routes
     route("contests", "routes/contests.tsx"),
-    route("problems", "routes/problems.tsx"),
-    route("problems/:problemId", "routes/problems.$problemId.tsx"),
-    route("submissions", "routes/submissions.tsx"),
-    route("submissions/:subId", "routes/submissions.$subId.tsx"),
-    route("scoreboard", "routes/scoreboard.tsx"),
-    route("announcements", "routes/announcements.tsx"),
-    route("clarifications", "routes/clarifications.tsx"),
+
+    // Contest-specific routes
+    ...prefix("contests/:contestId", [
+      index("routes/contests.$contestId.index.tsx"),
+      route("problems", "routes/contests.$contestId.problems.tsx"),
+      route("problems/:problemId", "routes/contests.$contestId.problems.$problemId.tsx"),
+      route("submissions", "routes/contests.$contestId.submissions.tsx"),
+      route("scoreboard", "routes/contests.$contestId.scoreboard.tsx"),
+      route("announcements", "routes/contests.$contestId.announcements.tsx"),
+      route("clarifications", "routes/contests.$contestId.clarifications.tsx"),
+    ]),
+
+    // Profile and general routes
     route("profile/:username", "routes/profile.$username.tsx"),
 
     // Admin routes

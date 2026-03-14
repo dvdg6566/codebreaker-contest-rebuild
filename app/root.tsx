@@ -11,6 +11,8 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { AuthProvider, type User } from "~/context/auth-context";
 import { WebSocketProvider } from "~/context/websocket-context";
+import { ContestProvider } from "~/contexts/contest-context";
+import type { Contest } from "~/types/database";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { getCurrentUser } = await import("~/lib/auth.server");
@@ -20,7 +22,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const wsEndpoint = process.env.API_GATEWAY_LINK || null;
 
   if (!session) {
-    return { user: null, wsEndpoint };
+    return { user: null, wsEndpoint, userContests: [] };
   }
 
   const user: User = {
@@ -29,7 +31,29 @@ export async function loader({ request }: Route.LoaderArgs) {
     role: session.role,
   };
 
-  return { user, wsEndpoint };
+  // Load user's active contests for the context
+  let userContests: Contest[] = [];
+  try {
+    const { getUserActiveContests } = await import("~/lib/db/users.server");
+    const { getContest } = await import("~/lib/contest.server");
+
+    const activeContests = await getUserActiveContests(session.username);
+    const contestIds = Object.keys(activeContests);
+
+    userContests = await Promise.all(
+      contestIds.map(async (contestId) => {
+        try {
+          return await getContest(contestId);
+        } catch {
+          return null;
+        }
+      })
+    ).then(contests => contests.filter(Boolean) as Contest[]);
+  } catch (error) {
+    console.error("Failed to load user contests:", error);
+  }
+
+  return { user, wsEndpoint, userContests };
 }
 
 export const links: Route.LinksFunction = () => [
@@ -64,12 +88,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App({ loaderData }: Route.ComponentProps) {
-  const { user, wsEndpoint } = loaderData;
+  const { user, wsEndpoint, userContests } = loaderData;
 
   return (
     <AuthProvider user={user}>
       <WebSocketProvider wsEndpoint={wsEndpoint}>
-        <Outlet />
+        <ContestProvider initialContests={userContests}>
+          <Outlet />
+        </ContestProvider>
       </WebSocketProvider>
     </AuthProvider>
   );

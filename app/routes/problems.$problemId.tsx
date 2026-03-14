@@ -172,12 +172,19 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   // Get user's contest settings for submission delay
-  const user = await getUser(session.username);
+  // Get submission delay from user's active contests (use minimum delay)
+  const { getUserActiveContests } = await import("~/lib/db/users.server");
+  const activeContests = await getUserActiveContests(session.username);
   let subDelay = 30; // Default delay
-  if (user?.contest) {
-    const contest = await getContest(user.contest);
-    if (contest) {
-      subDelay = contest.subDelay || 30;
+
+  if (Object.keys(activeContests).length > 0) {
+    const contests = await Promise.all(
+      Object.keys(activeContests).map(contestId => getContest(contestId))
+    );
+    // Use the minimum delay across all active contests (more permissive)
+    const delays = contests.filter((c): c is NonNullable<typeof c> => c !== null).map(c => c.subDelay || 30);
+    if (delays.length > 0) {
+      subDelay = Math.min(...delays);
     }
   }
 

@@ -192,9 +192,9 @@ export async function removeProblemFromContest(
 }
 
 /**
- * Add a user to a contest
+ * Add a user to a contest (contest side of dual ownership)
  */
-export async function addUserToContest(
+export async function addUserToContestRecord(
   contestId: string,
   username: string,
   started: boolean = false
@@ -211,9 +211,9 @@ export async function addUserToContest(
 }
 
 /**
- * Remove a user from a contest
+ * Remove a user from a contest (contest side of dual ownership)
  */
-export async function removeUserFromContest(
+export async function removeUserFromContestRecord(
   contestId: string,
   username: string
 ): Promise<Contest | null> {
@@ -234,7 +234,7 @@ export async function markUserStarted(
   contestId: string,
   username: string
 ): Promise<Contest | null> {
-  return addUserToContest(contestId, username, true);
+  return addUserToContestRecord(contestId, username, true);
 }
 
 /**

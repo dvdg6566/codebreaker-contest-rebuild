@@ -290,7 +290,7 @@ function ContestCard({ contest }: { contest: UserContestView }) {
         <div className="flex gap-2 pt-2 border-t">
           {contest.canView && (
             <Button asChild>
-              <Link to="/problems">
+              <Link to={`/contests/${contest.contestId}/problems`}>
                 <Play className="mr-2 h-4 w-4" />
                 Enter Contest
               </Link>
@@ -310,7 +310,7 @@ function ContestCard({ contest }: { contest: UserContestView }) {
 
           {contest.status === "ONGOING" && (
             <Button asChild variant="outline">
-              <Link to="/scoreboard">
+              <Link to={`/contests/${contest.contestId}/scoreboard`}>
                 <Trophy className="mr-2 h-4 w-4" />
                 Scoreboard
               </Link>
@@ -319,7 +319,7 @@ function ContestCard({ contest }: { contest: UserContestView }) {
 
           {(contest.status === "ONGOING" || contest.status === "ENDED") && (
             <Button asChild variant="ghost">
-              <Link to="/announcements">
+              <Link to={`/contests/${contest.contestId}`}>
                 <Eye className="mr-2 h-4 w-4" />
                 View Details
               </Link>

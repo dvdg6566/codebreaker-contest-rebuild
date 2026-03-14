@@ -1,4 +1,4 @@
-import { Link, useLocation, useFetcher } from "react-router";
+import { Link, useLocation, useFetcher, useParams } from "react-router";
 import {
   Home,
   Users,
@@ -14,9 +14,13 @@ import {
   Code2,
   LogOut,
   FileCode,
+  Play,
+  Clock,
 } from "lucide-react";
 import { useAuth } from "~/context/auth-context";
 import { useNotifications } from "~/context/websocket-context";
+import { useContestNavigation } from "~/contexts/contest-context";
+import { ContestSelector } from "~/components/contest/contest-selector";
 import { getInitials } from "~/lib/utils";
 
 import {
@@ -60,27 +64,27 @@ const mainNavItems = [
 const contestNavItems = [
   {
     title: "Problems",
-    url: "/problems",
+    path: "problems",
     icon: FileText,
   },
   {
     title: "Submissions",
-    url: "/submissions",
+    path: "submissions",
     icon: Send,
   },
   {
     title: "Scoreboard",
-    url: "/scoreboard",
+    path: "scoreboard",
     icon: BarChart3,
   },
   {
     title: "Announcements",
-    url: "/announcements",
+    path: "announcements",
     icon: Megaphone,
   },
   {
     title: "Clarifications",
-    url: "/clarifications",
+    path: "clarifications",
     icon: MessageSquare,
   },
 ];
@@ -180,42 +184,11 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Contest</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {contestNavItems.map((item) => {
-                // Determine badge count for this item
-                let badgeCount = 0;
-                if (item.url === "/announcements") {
-                  badgeCount = unreadAnnouncementsCount;
-                } else if (item.url === "/clarifications") {
-                  badgeCount = unreadClarificationsCount;
-                }
-
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive(item.url)}
-                      tooltip={item.title}
-                    >
-                      <Link to={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                        {badgeCount > 0 && (
-                          <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
-                            {badgeCount > 9 ? "9+" : badgeCount}
-                          </span>
-                        )}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <ContestSection
+          pathname={pathname}
+          unreadAnnouncementsCount={unreadAnnouncementsCount}
+          unreadClarificationsCount={unreadClarificationsCount}
+        />
 
         {isAdmin && (
           <SidebarGroup>
@@ -329,5 +302,158 @@ export function AppSidebar() {
 
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+// Contest Section Component for Multi-Contest Support
+function ContestSection({
+  pathname,
+  unreadAnnouncementsCount,
+  unreadClarificationsCount,
+}: {
+  pathname: string;
+  unreadAnnouncementsCount: number;
+  unreadClarificationsCount: number;
+}) {
+  const params = useParams();
+  const contestId = params.contestId;
+  const { currentContest, getContestPath, isInContestContext } = useContestNavigation();
+
+  const isActive = (url: string) => {
+    if (url === "/") {
+      return pathname === "/";
+    }
+    return pathname.startsWith(url);
+  };
+
+  const getContestUrl = (path: string) => {
+    if (currentContest) {
+      return `/contests/${currentContest.contestId}/${path}`;
+    }
+    return `/${path}`; // Fallback to legacy routes
+  };
+
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel className="flex items-center justify-between">
+        <span>Contest</span>
+        {currentContest && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            <span>Active</span>
+          </div>
+        )}
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        {/* Contest Selector */}
+        <ContestSelector variant="sidebar" showTimeRemaining />
+
+        <SidebarMenu>
+          {/* My Contests Link */}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={isActive("/contests")}
+              tooltip="My Contests"
+            >
+              <Link to="/contests">
+                <Trophy />
+                <span>My Contests</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          {/* Contest-specific navigation (show when contest is selected) */}
+          {currentContest && (
+            <>
+              {contestNavItems.map((item) => {
+                const fullUrl = getContestUrl(item.path);
+                let badgeCount = 0;
+
+                if (item.path === "announcements") {
+                  badgeCount = unreadAnnouncementsCount;
+                } else if (item.path === "clarifications") {
+                  badgeCount = unreadClarificationsCount;
+                }
+
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive(fullUrl)}
+                      tooltip={item.title}
+                    >
+                      <Link to={fullUrl}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                        {badgeCount > 0 && (
+                          <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
+                            {badgeCount > 9 ? "9+" : badgeCount}
+                          </span>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </>
+          )}
+
+          {/* Show global navigation when no contest is selected */}
+          {!currentContest && (
+            <>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/submissions")}
+                  tooltip="All Submissions"
+                >
+                  <Link to="/submissions">
+                    <Send />
+                    <span>All Submissions</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/announcements")}
+                  tooltip="Announcements"
+                >
+                  <Link to="/announcements">
+                    <Megaphone />
+                    <span>Announcements</span>
+                    {unreadAnnouncementsCount > 0 && (
+                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
+                        {unreadAnnouncementsCount > 9 ? "9+" : unreadAnnouncementsCount}
+                      </span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/clarifications")}
+                  tooltip="Clarifications"
+                >
+                  <Link to="/clarifications">
+                    <MessageSquare />
+                    <span>Clarifications</span>
+                    {unreadClarificationsCount > 0 && (
+                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
+                        {unreadClarificationsCount > 9 ? "9+" : unreadClarificationsCount}
+                      </span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </>
+          )}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }

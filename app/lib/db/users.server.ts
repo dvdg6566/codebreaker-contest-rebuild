@@ -4,8 +4,8 @@
  * Provides CRUD operations for user accounts using DynamoDB.
  */
 
-import type { User, UserRole } from "~/types/database";
-import { DEFAULT_USER } from "~/types/database";
+import type { User, UserRole, ContestParticipation } from "~/types/database";
+import { DEFAULT_USER, formatDateTime } from "~/types/database";
 import {
   docClient,
   TableNames,
@@ -108,43 +108,6 @@ export async function updateUser(
 }
 
 /**
- * Update user's problem score (if better than current)
- */
-export async function updateUserScore(
-  username: string,
-  problemName: string,
-  score: number,
-  submissionTime: string
-): Promise<User | null> {
-  const user = await getUser(username);
-  if (!user) return null;
-
-  const currentScore = user.problemScores[problemName] || 0;
-  const currentSubmissions = user.problemSubmissions[problemName] || 0;
-
-  const updates: Partial<User> = {
-    problemSubmissions: {
-      ...user.problemSubmissions,
-      [problemName]: currentSubmissions + 1,
-    },
-    latestSubmissions: {
-      ...user.latestSubmissions,
-      [problemName]: submissionTime,
-    },
-  };
-
-  if (score > currentScore) {
-    updates.problemScores = {
-      ...user.problemScores,
-      [problemName]: score,
-    };
-    updates.latestScoreChange = submissionTime;
-  }
-
-  return updateUser(username, updates);
-}
-
-/**
  * Delete a user
  */
 export async function deleteUser(username: string): Promise<boolean> {
@@ -157,12 +120,183 @@ export async function deleteUser(username: string): Promise<boolean> {
   return true;
 }
 
+// =============================================================================
+// MULTI-CONTEST FUNCTIONS
+// =============================================================================
+
 /**
- * Assign user to a contest
+ * Get user's active contests
  */
-export async function assignUserToContest(
+export async function getUserActiveContests(username: string): Promise<Record<string, ContestParticipation>> {
+  const user = await getUser(username);
+  if (!user) return {};
+
+  return user.activeContests;
+}
+
+/**
+ * Add user to a contest
+ */
+export async function addUserToContest(
+  username: string,
+  contestId: string,
+  status: "invited" | "started" = "invited"
+): Promise<void> {
+  const user = await getUser(username);
+  if (!user) {
+    throw new Error(`User ${username} not found`);
+  }
+
+  const participation: ContestParticipation = {
+    status,
+    joinedAt: formatDateTime(new Date()),
+    ...(status === "started" && { startedAt: formatDateTime(new Date()) }),
+  };
+
+  const updates: Partial<User> = {
+    activeContests: {
+      ...user.activeContests,
+      [contestId]: participation,
+    },
+  };
+
+  await updateUser(username, updates);
+}
+
+/**
+ * Remove user from a contest
+ */
+export async function removeUserFromContest(
   username: string,
   contestId: string
 ): Promise<void> {
-  await updateUser(username, { contest: contestId });
+  const user = await getUser(username);
+  if (!user) return;
+
+  const { [contestId]: _, ...remainingContests } = user.activeContests;
+
+  await updateUser(username, {
+    activeContests: remainingContests,
+  });
+}
+
+/**
+ * Update user's contest participation status
+ */
+export async function updateUserContestStatus(
+  username: string,
+  contestId: string,
+  updates: Partial<ContestParticipation>
+): Promise<void> {
+  const user = await getUser(username);
+  if (!user || !user.activeContests[contestId]) {
+    throw new Error(`User ${username} is not in contest ${contestId}`);
+  }
+
+  const currentParticipation = user.activeContests[contestId];
+  const updatedParticipation: ContestParticipation = {
+    ...currentParticipation,
+    ...updates,
+  };
+
+  await updateUser(username, {
+    activeContests: {
+      ...user.activeContests,
+      [contestId]: updatedParticipation,
+    },
+  });
+}
+
+/**
+ * Get user's contest-specific scores
+ */
+export async function getUserContestScores(
+  username: string,
+  contestId: string
+): Promise<Record<string, number>> {
+  const user = await getUser(username);
+  if (!user) return {};
+
+  return user.contestScores[contestId] || {};
+}
+
+/**
+ * Update user's score for a specific contest
+ */
+export async function updateUserContestScore(
+  username: string,
+  contestId: string,
+  problemName: string,
+  score: number,
+  submissionTime: string
+): Promise<void> {
+  const user = await getUser(username);
+  if (!user) return;
+
+  const currentContestScores = user.contestScores[contestId] || {};
+  const currentScore = currentContestScores[problemName] || 0;
+
+  const currentContestSubmissions = user.contestSubmissions[contestId] || {};
+  const currentSubmissions = currentContestSubmissions[problemName] || 0;
+
+  const currentLatestSubmissions = user.contestLatestSubmissions[contestId] || {};
+
+  const updates: Partial<User> = {
+    contestSubmissions: {
+      ...user.contestSubmissions,
+      [contestId]: {
+        ...currentContestSubmissions,
+        [problemName]: currentSubmissions + 1,
+      },
+    },
+    contestLatestSubmissions: {
+      ...user.contestLatestSubmissions,
+      [contestId]: {
+        ...currentLatestSubmissions,
+        [problemName]: submissionTime,
+      },
+    },
+  };
+
+  // Update score if it's better
+  if (score > currentScore) {
+    updates.contestScores = {
+      ...user.contestScores,
+      [contestId]: {
+        ...currentContestScores,
+        [problemName]: score,
+      },
+    };
+
+    // Update participation final score if this contest is completed
+    if (user.activeContests[contestId]?.status === "completed") {
+      const contestParticipation = user.activeContests[contestId];
+      const allContestScores = {
+        ...currentContestScores,
+        [problemName]: score,
+      };
+      const totalScore = Object.values(allContestScores).reduce((sum, s) => sum + s, 0);
+
+      updates.activeContests = {
+        ...user.activeContests,
+        [contestId]: {
+          ...contestParticipation,
+          finalScore: totalScore,
+        },
+      };
+    }
+  }
+
+  await updateUser(username, updates);
+}
+
+/**
+ * Check if user can access a specific contest
+ */
+export async function canUserAccessContest(
+  username: string,
+  contestId: string
+): Promise<boolean> {
+  const activeContests = await getUserActiveContests(username);
+  return contestId in activeContests;
 }

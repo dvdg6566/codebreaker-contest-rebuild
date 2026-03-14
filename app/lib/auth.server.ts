@@ -7,6 +7,11 @@ import {
   parseIdToken,
   type UserRole,
 } from "./cognito.server";
+import {
+  canUserAccessContest,
+  getContest,
+} from "./contest.server";
+import type { Contest } from "~/types/database";
 
 export type { SessionData, UserRole };
 
@@ -87,5 +92,43 @@ export async function requireAdmin(request: Request): Promise<SessionData> {
  */
 export async function getCurrentUser(request: Request): Promise<SessionData | null> {
   return getSession(request);
+}
+
+// =============================================================================
+// MULTI-CONTEST AUTH FUNCTIONS
+// =============================================================================
+
+/**
+ * Require contest access for contest-specific routes
+ */
+export async function requireContestAccess(
+  request: Request,
+  contestId: string
+): Promise<SessionData> {
+  const session = await requireAuth(request);
+  const hasAccess = await canUserAccessContest(session.username, contestId);
+
+  if (!hasAccess) {
+    throw new Response("Contest access denied", { status: 403 });
+  }
+
+  return session;
+}
+
+/**
+ * Get user with contest context (requires contestId)
+ */
+export async function getUserWithContestContext(
+  request: Request,
+  contestId: string
+): Promise<{ session: SessionData; contest: Contest | null }> {
+  const session = await requireAuth(request);
+  const contest = await getContest(contestId);
+  const hasAccess = await canUserAccessContest(session.username, contestId);
+
+  return {
+    session,
+    contest: hasAccess ? contest : null,
+  };
 }
 

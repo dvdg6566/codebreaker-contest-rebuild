@@ -1,11 +1,16 @@
 #!/usr/bin/env bun
 /**
- * Initialize Sample Test Data for Scoreboard Testing
+ * Initialize Sample Test Data for Contest System Testing
  *
  * This script creates:
  * - Sample users (admin, alice, bob, charlie, diana)
  * - A test contest with problems
  * - Sample submissions demonstrating IOI-style subtask-max scoring
+ *
+ * User Schema:
+ * - Users can participate in multiple contests simultaneously
+ * - Contest-specific data is stored per contest ID
+ * - Each user has activeContests, contestScores, contestSubmissions, and contestLatestSubmissions
  *
  * IOI-style scoring example:
  * - Problem "addition" has subtasks: [0, 36, 64] (100 total)
@@ -56,7 +61,14 @@ async function putItem(tableName: string, item: Record<string, unknown>): Promis
 }
 
 // ============================================================================
-// Sample Users
+// Time calculations (needed for user data)
+// ============================================================================
+const now = new Date();
+const startTime = new Date(now.getTime() - 2 * 60 * 60 * 1000); // Started 2 hours ago
+const endTime = new Date(now.getTime() + 3 * 60 * 60 * 1000); // Ends in 3 hours
+
+// ============================================================================
+// Sample Users (Multi-Contest Schema)
 // ============================================================================
 const USERS = [
   {
@@ -65,11 +77,22 @@ const USERS = [
     fullname: "Admin User",
     email: "admin@example.com",
     label: "organizer",
-    contest: "contest-1",
-    problemScores: {},
-    problemSubmissions: {},
-    latestSubmissions: {},
-    latestScoreChange: "",
+    activeContests: {
+      "contest-1": {
+        status: "started" as const,
+        joinedAt: formatDateTime(startTime),
+        startedAt: formatDateTime(startTime),
+      },
+    },
+    contestScores: {
+      "contest-1": {},
+    },
+    contestSubmissions: {
+      "contest-1": {},
+    },
+    contestLatestSubmissions: {
+      "contest-1": {},
+    },
   },
   {
     username: "alice",
@@ -77,11 +100,33 @@ const USERS = [
     fullname: "Alice Chen",
     email: "alice@example.com",
     label: "",
-    contest: "contest-1",
-    problemScores: {},
-    problemSubmissions: {},
-    latestSubmissions: {},
-    latestScoreChange: "",
+    activeContests: {
+      "contest-1": {
+        status: "started" as const,
+        joinedAt: formatDateTime(startTime),
+        startedAt: formatDateTime(startTime),
+      },
+    },
+    contestScores: {
+      "contest-1": {
+        addition: 100,
+        ping: 40,
+        prisoners: 27,
+      },
+    },
+    contestSubmissions: {
+      "contest-1": {
+        addition: [1, 2],
+        ping: [5],
+        prisoners: [],
+      },
+    },
+    contestLatestSubmissions: {
+      "contest-1": {
+        addition: formatDateTime(new Date(startTime.getTime() + 46 * 60 * 1000)), // Last addition submission
+        ping: formatDateTime(new Date(startTime.getTime() + 61 * 60 * 1000)),     // Ping submission
+      },
+    },
   },
   {
     username: "bob",
@@ -89,11 +134,30 @@ const USERS = [
     fullname: "Bob Smith",
     email: "bob@example.com",
     label: "",
-    contest: "contest-1",
-    problemScores: {},
-    problemSubmissions: {},
-    latestSubmissions: {},
-    latestScoreChange: "",
+    activeContests: {
+      "contest-1": {
+        status: "started" as const,
+        joinedAt: formatDateTime(startTime),
+        startedAt: formatDateTime(startTime),
+      },
+    },
+    contestScores: {
+      "contest-1": {
+        addition: 36,
+      },
+    },
+    contestSubmissions: {
+      "contest-1": {
+        addition: [3],
+        ping: [],
+        prisoners: [],
+      },
+    },
+    contestLatestSubmissions: {
+      "contest-1": {
+        addition: formatDateTime(new Date(startTime.getTime() + 31 * 60 * 1000)), // Addition submission
+      },
+    },
   },
   {
     username: "charlie",
@@ -101,11 +165,33 @@ const USERS = [
     fullname: "Charlie Brown",
     email: "charlie@example.com",
     label: "",
-    contest: "contest-1",
-    problemScores: {},
-    problemSubmissions: {},
-    latestSubmissions: {},
-    latestScoreChange: "",
+    activeContests: {
+      "contest-1": {
+        status: "started" as const,
+        joinedAt: formatDateTime(startTime),
+        startedAt: formatDateTime(startTime),
+      },
+    },
+    contestScores: {
+      "contest-1": {
+        addition: 100,
+        ping: 100,
+        prisoners: 56,
+      },
+    },
+    contestSubmissions: {
+      "contest-1": {
+        addition: [4],
+        ping: [6],
+        prisoners: [],
+      },
+    },
+    contestLatestSubmissions: {
+      "contest-1": {
+        addition: formatDateTime(new Date(startTime.getTime() + 21 * 60 * 1000)), // Addition submission
+        ping: formatDateTime(new Date(startTime.getTime() + 91 * 60 * 1000)),      // Ping submission
+      },
+    },
   },
   {
     username: "diana",
@@ -113,21 +199,27 @@ const USERS = [
     fullname: "Diana Prince",
     email: "diana@example.com",
     label: "",
-    contest: "contest-1",
-    problemScores: {},
-    problemSubmissions: {},
-    latestSubmissions: {},
-    latestScoreChange: "",
+    activeContests: {
+      "contest-1": {
+        status: "invited" as const,
+        joinedAt: formatDateTime(startTime),
+      },
+    },
+    contestScores: {
+      "contest-1": {},
+    },
+    contestSubmissions: {
+      "contest-1": {},
+    },
+    contestLatestSubmissions: {
+      "contest-1": {},
+    },
   },
 ];
 
 // ============================================================================
 // Sample Contest
 // ============================================================================
-const now = new Date();
-const startTime = new Date(now.getTime() - 2 * 60 * 60 * 1000); // Started 2 hours ago
-const endTime = new Date(now.getTime() + 3 * 60 * 60 * 1000); // Ends in 3 hours
-
 const CONTEST = {
   contestId: "contest-1",
   contestName: "IOI Practice Round 2024",
@@ -305,7 +397,7 @@ const SUBMISSIONS = [
 // Main
 // ============================================================================
 async function main(): Promise<void> {
-  console.log("=== Initializing Scoreboard Test Data ===");
+  console.log("=== Initializing Contest Test Data ===");
   console.log(`Judge Name: ${JUDGE_NAME}`);
   console.log(`Region: ${REGION}`);
 
@@ -354,14 +446,49 @@ async function main(): Promise<void> {
       ok ? passed++ : failed++;
     }
 
-    // Check each user exists
+    // Check each user exists and has correct schema
     for (const user of USERS) {
-      await check(`User '${user.username}' in DynamoDB`, async () => {
+      await check(`User '${user.username}' exists in DynamoDB`, async () => {
         const res = await dynamodb.send(new GetItemCommand({
           TableName: TABLES.users,
           Key: { username: { S: user.username } },
         }));
         return !!res.Item;
+      });
+
+      await check(`User '${user.username}' has correct schema`, async () => {
+        const res = await dynamodb.send(new GetItemCommand({
+          TableName: TABLES.users,
+          Key: { username: { S: user.username } },
+        }));
+
+        if (!res.Item) return false;
+
+        // Check for required multi-contest fields
+        const hasActiveContests = !!res.Item.activeContests;
+        const hasContestScores = !!res.Item.contestScores;
+        const hasContestSubmissions = !!res.Item.contestSubmissions;
+        const hasContestLatestSubmissions = !!res.Item.contestLatestSubmissions;
+
+        return hasActiveContests && hasContestScores &&
+               hasContestSubmissions && hasContestLatestSubmissions;
+      });
+
+      await check(`User '${user.username}' has correct contest participation`, async () => {
+        const res = await dynamodb.send(new GetItemCommand({
+          TableName: TABLES.users,
+          Key: { username: { S: user.username } },
+        }));
+
+        if (!res.Item?.activeContests?.M) return false;
+
+        // Should have contest-1 participation
+        const contest1Participation = res.Item.activeContests.M["contest-1"];
+        if (!contest1Participation?.M) return false;
+
+        // Should have status field
+        const status = contest1Participation.M.status?.S;
+        return status === "started" || status === "invited";
       });
     }
 
@@ -387,6 +514,12 @@ async function main(): Promise<void> {
     if (failed > 0) {
       console.error(`  ${failed} check(s) failed — data may not have been written correctly`);
       process.exit(1);
+    } else {
+      console.log("\n🎉 All validations passed! Users created successfully:");
+      console.log("  ✓ Active contests with participation data");
+      console.log("  ✓ Contest-specific scores, submissions, and latest submissions");
+      console.log("  ✓ Clean user schema implementation");
+      console.log("  ✓ Users ready for contest system");
     }
   } catch (error) {
     console.error("Error during initialization:", error);
