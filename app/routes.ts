@@ -52,7 +52,7 @@ export default [
     ...prefix("contests/:contestId", [
       index("routes/contests.$contestId.index.tsx"),
       route("problems", "routes/contests.$contestId.problems.tsx"),
-      route("problems/:problemId", "routes/contests.$contestId.problems.$problemId.tsx"),
+      route("problem/:problemId", "routes/contests.$contestId.problem.$problemId.tsx"),
       route("submissions", "routes/contests.$contestId.submissions.tsx"),
       route("scoreboard", "routes/contests.$contestId.scoreboard.tsx"),
       route("announcements", "routes/contests.$contestId.announcements.tsx"),
@@ -72,9 +72,10 @@ export default [
       route("contests", "routes/admin/contests.tsx"),
       route("contests/:contestId", "routes/admin/contests.$contestId.tsx"),
       route("problems", "routes/admin/problems.tsx"),
-      route("problems/:problemId", "routes/admin/problems.$problemId.tsx"),
+      route("problem/:problemId", "routes/admin/problem.$problemId.tsx"),
+      route("editproblem/:problemId", "routes/admin/editproblem.$problemId.tsx"),
       route(
-        "problems/:problemId/testdata",
+        "editproblem/:problemId/testdata",
         "routes/admin/problems.$problemId.testdata.tsx"
       ),
       route("clarifications", "routes/admin/clarifications.tsx"),

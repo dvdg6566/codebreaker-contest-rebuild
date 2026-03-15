@@ -1,5 +1,5 @@
-import type { Route } from "./+types/contests.$contestId.problems.$problemId";
-import { Link, Form, useFetcher, useRevalidator } from "react-router";
+import type { Route } from "./+types/contests.$contestId.problem.$problemId";
+import { Link, Form, useFetcher, useRevalidator, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import {
   ChevronLeft,
@@ -90,6 +90,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     throw new Response("Contest ID and Problem ID required", { status: 400 });
   }
 
+  const { requireContestAccess } = await import("~/lib/auth.server");
   const session = await requireContestAccess(request, contestId);
   const formData = await request.formData();
   const intent = formData.get("intent");
@@ -259,6 +260,14 @@ export default function ContestProblem({ loaderData, actionData }: Route.Compone
   const [code, setCode] = useState("");
   const [language, setLanguage] = useState("cpp");
   const revalidator = useRevalidator();
+  const navigate = useNavigate();
+
+  // Redirect to submission page after successful submit
+  useEffect(() => {
+    if (actionData?.success && actionData?.submissionId) {
+      navigate(`/submissions/${actionData.submissionId}`);
+    }
+  }, [actionData, navigate]);
 
   // Auto-refresh submissions if any are still grading
   useEffect(() => {

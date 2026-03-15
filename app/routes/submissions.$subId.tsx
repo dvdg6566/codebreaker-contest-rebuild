@@ -234,7 +234,7 @@ export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
             </div>
             <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
               <Link
-                to={`/admin/problems/${submissionData.problemId}`}
+                to={`/admin/problem/${submissionData.problemId}`}
                 className="hover:underline"
               >
                 {submissionData.problem}
@@ -462,7 +462,7 @@ export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
             </CardHeader>
             <CardContent className="space-y-2">
               <Button variant="outline" className="w-full justify-start" asChild>
-                <Link to={`/admin/problems/${submissionData.problemId}`}>
+                <Link to={`/admin/problem/${submissionData.problemId}`}>
                   <Code2 className="h-4 w-4 mr-2" />
                   View Problem
                 </Link>

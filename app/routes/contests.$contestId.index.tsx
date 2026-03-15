@@ -47,6 +47,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     throw new Response("Contest ID required", { status: 400 });
   }
 
+  const { requireContestAccess } = await import("~/lib/auth.server");
   const session = await requireContestAccess(request, contestId);
   const formData = await request.formData();
   const intent = formData.get("intent");

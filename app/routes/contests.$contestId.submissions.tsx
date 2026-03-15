@@ -287,7 +287,7 @@ export default function ContestSubmissions({ loaderData }: Route.ComponentProps)
                         <TableCell className="font-medium">#{submission.subId}</TableCell>
                         <TableCell>
                           <Link
-                            to={`/contests/${contest.contestId}/problems/${submission.problemName}`}
+                            to={`/contests/${contest.contestId}/problem/${submission.problemName}`}
                             className="hover:underline"
                           >
                             {problem?.title || submission.problemName}

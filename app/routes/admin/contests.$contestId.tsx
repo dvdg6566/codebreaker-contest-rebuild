@@ -665,7 +665,7 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
                           </TableCell>
                           <TableCell>
                             <Link
-                              to={`/admin/problems/${problem.problemName}`}
+                              to={`/admin/editproblem/${problem.problemName}`}
                               className="font-medium hover:underline"
                             >
                               {problem.title}

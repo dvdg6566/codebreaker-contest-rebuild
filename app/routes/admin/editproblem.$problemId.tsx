@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link, useFetcher, useRevalidator } from "react-router";
-import type { Route } from "./+types/problems.$problemId";
+import type { Route } from "./+types/editproblem.$problemId";
 import {
   DndContext,
   closestCenter,
@@ -571,6 +571,12 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link to={`/admin/problem/${problem.problemName}`} target="_blank">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Test Problem
+            </Link>
+          </Button>
           <Button onClick={handleSave} disabled={isLoading}>
             <Save className="mr-2 h-4 w-4" />
             Save Changes
@@ -946,7 +952,7 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2">
               <Button variant="outline" asChild>
-                <Link to={`/admin/problems/${problem.problemName}/testdata`} target="_blank">
+                <Link to={`/admin/editproblem/${problem.problemName}/testdata`} target="_blank">
                   <Upload className="mr-2 h-4 w-4" />
                   Manage Testdata
                 </Link>

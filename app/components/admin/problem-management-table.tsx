@@ -30,7 +30,7 @@ export const problemColumns: ColumnDef<ProblemListItem>[] = [
       const problemName = row.getValue("problemName") as string;
       return (
         <Link
-          to={`/admin/problems/${problemName}`}
+          to={`/admin/problem/${problemName}`}
           className="font-medium text-primary hover:underline"
         >
           {problemName}
@@ -98,7 +98,7 @@ export const problemColumns: ColumnDef<ProblemListItem>[] = [
 
       return (
         <Button variant="ghost" size="icon" asChild>
-          <Link to={`/admin/problems/${problem.problemName}`}>
+          <Link to={`/admin/editproblem/${problem.problemName}`}>
             <Pencil className="h-4 w-4" />
             <span className="sr-only">Edit problem</span>
           </Link>

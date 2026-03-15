@@ -68,7 +68,7 @@ const submissionColumns: ColumnDef<SubmissionRow>[] = [
       const problemTitle = row.original.problemTitle;
       return (
         <Link
-          to={`/admin/problems/${problemName}`}
+          to={`/admin/problem/${problemName}`}
           className="hover:underline text-sm"
         >
           {problemTitle !== problemName ? problemTitle : problemName}

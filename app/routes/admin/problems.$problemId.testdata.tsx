@@ -439,7 +439,7 @@ export default function TestdataPage({ loaderData }: Route.ComponentProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
-            <Link to={`/admin/problems/${problemId}`}>
+            <Link to={`/admin/editproblem/${problemId}`}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>

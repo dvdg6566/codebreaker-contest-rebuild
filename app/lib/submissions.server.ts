@@ -67,11 +67,19 @@ export async function submitSolution(params: SubmitSolutionParams): Promise<Subm
     problemName,
     language,
     code,
-    contestId || "global"
+    contestId || "global",
+    problem.testcaseCount
   );
 
-  // TODO: Trigger grading via AWS Lambda
-  // For now, the submission will remain in pending state
+  // Trigger grading via Step Function
+  const { startGrading } = await import("./grading.server");
+  await startGrading({
+    problemName,
+    submissionId: submission.subId,
+    username,
+    language,
+    problemType: problem.problem_type,
+  });
 
   return submission;
 }

@@ -44,7 +44,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     await createProblem(problemId, { title: problemId });
-    return redirect(`/admin/problems/${problemId}`);
+    return redirect(`/admin/editproblem/${problemId}`);
   } catch (error) {
     return data({ error: "Problem ID already exists" }, { status: 400 });
   }

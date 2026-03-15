@@ -144,7 +144,7 @@ export default function ContestProblems({ loaderData }: Route.ComponentProps) {
           const isPartialSolved = problemScore > 0 && problemScore < maxProblemScore;
 
           return (
-            <Link key={problem.problemName} to={`/contests/${contest.contestId}/problems/${problem.problemName}`}>
+            <Link key={problem.problemName} to={`/contests/${contest.contestId}/problem/${problem.problemName}`}>
               <Card className="hover:shadow-md transition-shadow cursor-pointer">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
