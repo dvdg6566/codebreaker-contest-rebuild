@@ -1,4 +1,6 @@
-# Codebreaker Contest Manager - Deployment Instructions
+# Codebreaker Contest - AWS Infrastructure
+
+This directory contains all AWS infrastructure as code for deploying the Codebreaker Contest backend. Everything is deployed via **AWS SAM** (Serverless Application Model) and **CloudFormation**.
 
 ## Prerequisites
 
@@ -11,20 +13,45 @@
 
 ```
 auto/
-├── template.yml              # Main orchestrator
+├── template.yml                    # Main CloudFormation orchestrator
+├── samconfig.toml                  # SAM deployment configuration
 ├── templates/
-│   ├── storage.yml           # S3 buckets
-│   ├── database.yml          # DynamoDB tables
-│   ├── cognito.yml           # User authentication
-│   ├── codebuild.yml         # ECR + CodeBuild + Compiler Lambda (auto-deployed)
-│   ├── lambdas.yml           # Lambda functions
-│   ├── websocket.yml         # WebSocket API Gateway
-│   └── step-functions.yml    # State machines
-├── lambda-functions/         # Lambda source code
-│   └── codebuild-trigger/    # Custom Resource for compiler deployment
-├── state-machines/           # Step Function definitions
-└── samconfig.toml            # SAM deployment configuration
+│   ├── storage.yml                 # S3 buckets (6 buckets)
+│   ├── database.yml                # DynamoDB tables (9 tables)
+│   ├── cognito.yml                 # User authentication
+│   ├── codebuild.yml               # ECR + CodeBuild + Compiler Lambda
+│   ├── lambdas.yml                 # Lambda functions + IAM roles
+│   ├── websocket.yml               # WebSocket API Gateway
+│   └── step-functions.yml          # Grading + WebSocket state machines
+├── lambda-functions/
+│   ├── codebuild-trigger/          # Custom Resource for compiler deployment
+│   ├── compiler/                   # Code compilation (Docker-based)
+│   ├── contest-end-notifier/       # Contest end WebSocket notifications
+│   ├── grader-problem-init/        # Initialize submission grading
+│   ├── grader-problem-scorer/      # Aggregate testcase scores
+│   ├── problem-validation/         # Validate problem configuration
+│   ├── regrade-problem/            # Trigger regrade for all submissions
+│   ├── testcase-grader/            # Execute code against testcase
+│   ├── testcase-grader-wrapper/    # DynamoDB update wrapper
+│   ├── websocket-connections/      # WebSocket connect/disconnect handler
+│   └── websocket-invoke/           # Send WebSocket notifications
+└── state-machines/
+    ├── grading.asl.json            # Submission grading workflow
+    └── websocket.asl.json          # Parallel notification broadcast
 ```
+
+## Resources Created
+
+| Category | Resources |
+|----------|-----------|
+| **DynamoDB** | users, contests, problems, submissions, announcements, clarifications, websocket, global-counters, submission-locks |
+| **S3** | submissions, testdata, statements, attachments, checkers, graders |
+| **Lambda** | 11 functions (compiler, grading pipeline, WebSocket, notifications) |
+| **Step Functions** | grading (submission workflow), websocket (parallel broadcast) |
+| **API Gateway** | WebSocket API for real-time notifications |
+| **Cognito** | User pool with admin/contestant groups |
+| **EventBridge** | Schedule group for contest end notifications |
+| **IAM** | 4 roles (compiler, codebuild, testdata-upload, contest-end-scheduler) |
 
 ---
 
@@ -195,72 +222,6 @@ sam build && sam deploy
 
 ---
 
-## Packaging for One-Click Deployment
-
-To create a CloudFormation Quick Create link, you need to package and host the templates in S3.
-
-### Step 1: Create an S3 Bucket for Templates
-
-```bash
-aws s3 mb s3://codebreaker-templates-<your-unique-suffix> --region <your-region>
-```
-
-### Step 2: Package the Templates
-
-```bash
-sam package \
-  --template-file template.yml \
-  --output-template-file packaged.yml \
-  --s3-bucket codebreaker-templates-<your-unique-suffix> \
-  --s3-prefix templates
-```
-
-This uploads:
-- Lambda code zip files to S3
-- Nested templates to S3
-- Produces `packaged.yml` with S3 URLs
-
-### Step 3: Upload the Packaged Main Template
-
-```bash
-aws s3 cp packaged.yml s3://codebreaker-templates-<your-unique-suffix>/packaged.yml
-```
-
-### Step 4: Make Templates Public (for public Quick Create link)
-
-```bash
-# Option A: Make bucket public (use with caution)
-aws s3api put-bucket-policy --bucket codebreaker-templates-<your-unique-suffix> --policy '{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Sid": "PublicRead",
-    "Effect": "Allow",
-    "Principal": "*",
-    "Action": "s3:GetObject",
-    "Resource": "arn:aws:s3:::codebreaker-templates-<your-unique-suffix>/*"
-  }]
-}'
-
-# Option B: Make specific objects public
-aws s3api put-object-acl --bucket codebreaker-templates-<your-unique-suffix> --key packaged.yml --acl public-read
-```
-
-### Step 5: Generate Quick Create Link
-
-```
-https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate
-  ?templateURL=https://codebreaker-templates-<your-unique-suffix>.s3.amazonaws.com/packaged.yml
-  &stackName=codebreaker
-  &param_JudgeName=mycontest
-```
-
-URL-encoded version:
-```
-https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?templateURL=https%3A%2F%2Fcodebreaker-templates-<your-unique-suffix>.s3.amazonaws.com%2Fpackaged.yml&stackName=codebreaker&param_JudgeName=mycontest
-```
-
----
-
 ## Post-Deployment Steps
 
 ### 1. Compiler Lambda (Automatic)
@@ -285,18 +246,6 @@ aws cloudformation describe-stacks --stack-name codebreaker-contest
 aws cloudformation describe-stacks --stack-name codebreaker-contest --query 'Stacks[0].Outputs'
 ```
 
-### 3. Test Lambda Functions
-
-```bash
-# Test problem validation
-aws lambda invoke \
-  --function-name mycontest-problem-validation \
-  --payload '{"problemName": "addition"}' \
-  response.json
-
-cat response.json
-```
-
 ---
 
 ## Updating the Stack
@@ -306,47 +255,6 @@ cat response.json
 sam build && sam deploy
 ```
 
-CloudFormation will only update resources that changed, so if only one nested template was modified, only that nested stack will be updated.
+CloudFormation will only update resources that changed.
 
-For one-click deployment updates:
-```bash
-sam package \
-  --template-file template.yml \
-  --output-template-file packaged.yml \
-  --s3-bucket codebreaker-templates-<your-unique-suffix> \
-  --s3-prefix templates
-
-aws s3 cp packaged.yml s3://codebreaker-templates-<your-unique-suffix>/packaged.yml
-```
-
-### Deploying Individual Nested Stacks
-
-You can deploy a nested template as a standalone stack for testing or isolated updates:
-
-```bash
-# Deploy only the CodeBuild stack
-sam deploy \
-  --template-file templates/codebuild.yml \
-  --stack-name <JudgeName>-codebuild-standalone \
-  --parameter-overrides JudgeName=<JudgeName> \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --region ap-southeast-1
-
-# Deploy only the Storage stack
-sam deploy \
-  --template-file templates/storage.yml \
-  --stack-name <JudgeName>-storage-standalone \
-  --parameter-overrides JudgeName=<JudgeName> \
-  --region ap-southeast-1
-
-# Deploy only the Database stack
-sam deploy \
-  --template-file templates/database.yml \
-  --stack-name <JudgeName>-database-standalone \
-  --parameter-overrides JudgeName=<JudgeName> \
-  --region ap-southeast-1
-```
-
-**Note:** Standalone deployments create separate resources. For production, always deploy through the main `template.yml` to maintain proper resource references.
-
----
+For one-click deployment packaging, see [ONE_CLICK_DEPLOYMENT.md](./ONE_CLICK_DEPLOYMENT.md).

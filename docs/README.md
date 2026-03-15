@@ -1,36 +1,35 @@
 # Documentation
 
-This directory contains comprehensive documentation for the Codebreaker Contest System.
+This directory contains documentation for the Codebreaker Contest System.
 
-## Primary Documentation
-
-📖 **[SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)** - Complete technical documentation covering:
-- Frontend React Router 7 application
-- AWS serverless backend architecture
-- Database schemas (DynamoDB)
-- Lambda functions and workflows
-- WebSocket real-time infrastructure
-- Deployment and configuration
+## Documentation
 
 🗄️ **[DATABASE_QUERIES.md](./DATABASE_QUERIES.md)** - Database query patterns and function mappings:
 - Query breakdown per route/page
 - Database module function reference
 - DynamoDB table usage patterns
 
-## Visual Resources
-
 🖼️ **[Codebreaker-Architecture.png](./Codebreaker-Architecture.png)** - System architecture diagram
 
-## Getting Started
+## Other Resources
 
-1. Read the [System Architecture documentation](./SYSTEM_ARCHITECTURE.md) for complete technical details
-2. Follow the deployment instructions in Section 12
-3. Use the validation script (`scripts/validate-aws-setup.ts`) to verify your setup
+- **[/auto/README.md](../auto/README.md)** - AWS infrastructure deployment guide
+- **[Root README.md](../README.md)** - Project overview and getting started
 
 ## Quick Reference
 
-- **Frontend:** React 19 + React Router 7 + TailwindCSS 4
-- **Backend:** AWS Lambda + DynamoDB + S3 + Step Functions
-- **Real-time:** API Gateway WebSocket + Step Functions
-- **Authentication:** AWS Cognito
-- **Deployment:** CloudFormation via AWS SAM
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | React 19, React Router 7, TailwindCSS 4, shadcn/ui |
+| **Backend** | AWS Lambda (Python), DynamoDB, S3, Step Functions |
+| **Real-time** | API Gateway WebSocket, EventBridge Scheduler |
+| **Auth** | AWS Cognito |
+| **Deployment** | CloudFormation via AWS SAM |
+
+## Validation
+
+Verify AWS resources are properly configured:
+
+```bash
+bun validate
+```
