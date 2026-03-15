@@ -101,7 +101,7 @@ fi
 
 echo ""
 echo -e "${BLUE}======================================${NC}"
-echo -e "${GREEN}  Deployment Complete!${NC}"
+echo -e "${GREEN}  Infrastructure Deployment Complete!${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo ""
 echo -e "${YELLOW}Configuration values (add to .env):${NC}"
@@ -116,6 +116,50 @@ echo "Username: admin"
 echo "Password: $ADMIN_PASSWORD"
 echo ""
 echo -e "${YELLOW}Important: Save these credentials securely!${NC}"
+echo ""
+
+# Ask about data initialization
+echo -e "${YELLOW}Would you like to initialize sample data?${NC}"
+echo "Available options:"
+echo "  1) All (users, problems, testdata)"
+echo "  2) Users only"
+echo "  3) Problems only"
+echo "  4) Testdata only"
+echo "  5) Skip"
+echo ""
+read -p "Enter choice [1-5]: " init_choice
+
+case $init_choice in
+    1)
+        echo -e "${GREEN}Initializing all sample data...${NC}"
+        bun run init:all
+        ;;
+    2)
+        echo -e "${GREEN}Initializing users...${NC}"
+        bun run init:users
+        ;;
+    3)
+        echo -e "${GREEN}Initializing problems...${NC}"
+        bun run init:problems
+        ;;
+    4)
+        echo -e "${GREEN}Initializing testdata...${NC}"
+        bun run init:testdata
+        ;;
+    5|*)
+        echo -e "${YELLOW}Skipping data initialization.${NC}"
+        echo "You can run these later with:"
+        echo "  bun run init:users    - Initialize sample users"
+        echo "  bun run init:problems - Initialize sample problems"
+        echo "  bun run init:testdata - Initialize test data"
+        echo "  bun run init:all      - Initialize everything"
+        ;;
+esac
+
+echo ""
+echo -e "${BLUE}======================================${NC}"
+echo -e "${GREEN}  Setup Complete!${NC}"
+echo -e "${BLUE}======================================${NC}"
 echo ""
 echo -e "${GREEN}To start the application:${NC}"
 echo "1. Copy the configuration above to your .env file"
