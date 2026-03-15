@@ -151,10 +151,8 @@ export async function action({ request, params }: Route.ActionArgs) {
   await requireAdmin(request);
   const { getProblem } = await import("~/lib/db/problems.server");
   const { canUserSubmit } = await import("~/lib/db/submissions.server");
-  const { submitForGrading } = await import("~/lib/grading.server");
   const { getLanguageIdFromName } = await import("~/lib/languages");
   const { getContest } = await import("~/lib/db/contests.server");
-  const { getUser } = await import("~/lib/db/users.server");
 
   const session = await requireAuth(request);
 
@@ -219,7 +217,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       username: session.username,
       problemName,
       language,
-      code: problem.problem_type === "Communication" ? (codeA || code) : code,
+      code: problem.problem_type === "Communication" ? undefined : code,
+      codeA: problem.problem_type === "Communication" ? codeA : undefined,
+      codeB: problem.problem_type === "Communication" ? codeB : undefined,
       // No contestId = global admin submission
     });
 

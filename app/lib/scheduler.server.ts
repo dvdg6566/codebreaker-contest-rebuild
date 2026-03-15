@@ -87,11 +87,8 @@ export async function scheduleContestEnd(
 
   // Don't schedule if endTime is in the past
   if (endTime <= new Date()) {
-    console.log(`Contest ${contestId} endTime is in the past, not scheduling`);
     return;
   }
-
-  console.log(`Scheduling contest end: ${contestId} at ${endTime.toISOString()}`);
 
   await scheduler.send(
     new CreateScheduleCommand({
@@ -129,11 +126,8 @@ export async function scheduleUserContestEnd(
 
   // Don't schedule if endTime is in the past
   if (endTime <= new Date()) {
-    console.log(`User ${username} contest ${contestId} endTime is in the past, not scheduling`);
     return;
   }
-
-  console.log(`Scheduling user contest end: ${username} in ${contestId} at ${endTime.toISOString()}`);
 
   await scheduler.send(
     new CreateScheduleCommand({
@@ -169,8 +163,6 @@ export async function cancelContestEndSchedule(contestId: string): Promise<void>
       return;
     }
 
-    console.log(`Cancelling contest end schedule: ${contestId}`);
-
     await scheduler.send(
       new DeleteScheduleCommand({
         Name: scheduleName,
@@ -203,8 +195,6 @@ export async function cancelUserContestEndSchedule(
     if (!exists) {
       return;
     }
-
-    console.log(`Cancelling user contest end schedule: ${username} in ${contestId}`);
 
     await scheduler.send(
       new DeleteScheduleCommand({

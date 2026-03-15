@@ -97,16 +97,31 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (intent === "submit") {
     const { submitSolution } = await import("~/lib/submissions.server");
+    const { getProblem } = await import("~/lib/db/problems.server");
 
     const code = formData.get("code") as string;
+    const codeA = formData.get("codeA") as string;
+    const codeB = formData.get("codeB") as string;
     const language = formData.get("language") as string;
-
-    if (!code?.trim()) {
-      return { error: "Code cannot be empty" };
-    }
 
     if (!["cpp", "py", "java"].includes(language)) {
       return { error: "Invalid language selected" };
+    }
+
+    const problem = await getProblem(problemId);
+    if (!problem) {
+      return { error: "Problem not found" };
+    }
+
+    // Validate based on problem type
+    if (problem.problem_type === "Communication") {
+      if (!codeA?.trim() || !codeB?.trim()) {
+        return { error: "Both source files are required" };
+      }
+    } else {
+      if (!code?.trim()) {
+        return { error: "Code cannot be empty" };
+      }
     }
 
     try {
@@ -114,7 +129,9 @@ export async function action({ request, params }: Route.ActionArgs) {
         username: session.username,
         problemName: problemId,
         language,
-        code,
+        code: problem.problem_type === "Communication" ? undefined : code,
+        codeA: problem.problem_type === "Communication" ? codeA : undefined,
+        codeB: problem.problem_type === "Communication" ? codeB : undefined,
         contestId,
       });
 
@@ -258,9 +275,12 @@ const verdictIcon = (verdict: string) => {
 export default function ContestProblem({ loaderData, actionData }: Route.ComponentProps) {
   const { contest, problem, user, canSubmit, submissions, maxScore, subtasks } = loaderData;
   const [code, setCode] = useState("");
+  const [codeA, setCodeA] = useState("");
+  const [codeB, setCodeB] = useState("");
   const [language, setLanguage] = useState("cpp");
   const revalidator = useRevalidator();
   const navigate = useNavigate();
+  const isCommunication = problem.problem_type === "Communication";
 
   // Redirect to submission page after successful submit
   useEffect(() => {
@@ -416,20 +436,47 @@ export default function ContestProblem({ loaderData, actionData }: Route.Compone
                     </Select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Source Code</label>
-                    <Textarea
-                      name="code"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      placeholder="Enter your solution here..."
-                      className="font-mono text-sm min-h-[300px]"
-                    />
-                  </div>
+                  {isCommunication ? (
+                    <Tabs defaultValue="codeA" className="w-full">
+                      <TabsList className="mb-2">
+                        <TabsTrigger value="codeA">{problem.nameA || "File A"}</TabsTrigger>
+                        <TabsTrigger value="codeB">{problem.nameB || "File B"}</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="codeA">
+                        <Textarea
+                          name="codeA"
+                          value={codeA}
+                          onChange={(e) => setCodeA(e.target.value)}
+                          placeholder={`Enter ${problem.nameA || "File A"} code here...`}
+                          className="font-mono text-sm min-h-[300px]"
+                        />
+                      </TabsContent>
+                      <TabsContent value="codeB">
+                        <Textarea
+                          name="codeB"
+                          value={codeB}
+                          onChange={(e) => setCodeB(e.target.value)}
+                          placeholder={`Enter ${problem.nameB || "File B"} code here...`}
+                          className="font-mono text-sm min-h-[300px]"
+                        />
+                      </TabsContent>
+                    </Tabs>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Source Code</label>
+                      <Textarea
+                        name="code"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        placeholder="Enter your solution here..."
+                        className="font-mono text-sm min-h-[300px]"
+                      />
+                    </div>
+                  )}
 
                   <Button
                     type="submit"
-                    disabled={!code.trim()}
+                    disabled={isCommunication ? (!codeA.trim() || !codeB.trim()) : !code.trim()}
                     className="w-full"
                   >
                     <Send className="h-4 w-4 mr-2" />

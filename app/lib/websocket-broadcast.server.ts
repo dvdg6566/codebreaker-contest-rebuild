@@ -77,7 +77,6 @@ async function invoke(
     .filter(Boolean);
 
   if (connectionIds.length === 0) {
-    console.log("No connections to broadcast to");
     return;
   }
 
@@ -92,10 +91,6 @@ async function invoke(
     notificationType,
     connectionIds: bucket,
   }));
-
-  console.log(
-    `Broadcasting ${notificationType} to ${connectionIds.length} connections in ${buckets.length} batches`
-  );
 
   try {
     await sfnClient.send(

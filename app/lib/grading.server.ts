@@ -4,17 +4,9 @@
  * Handles submission grading via AWS Step Functions.
  */
 
-import {
-  SFNClient,
-  StartExecutionCommand,
-} from "@aws-sdk/client-sfn";
-import { getLanguageExtension, isValidLanguage } from "./languages";
+import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
 import { getProblem } from "./db/problems.server";
-import {
-  createSubmissionWithSource,
-  createCommunicationSubmission,
-  getSubmission,
-} from "./db/submissions.server";
+import { getSubmission } from "./db/submissions.server";
 
 // Configuration
 const config = {
@@ -26,129 +18,10 @@ const config = {
 // Step Function ARN
 const STEP_FUNCTION_ARN = `arn:aws:states:${config.region}:${config.accountId}:stateMachine:${config.judgeName}-grading`;
 
-console.log("Step Function ARN:", STEP_FUNCTION_ARN);
-
 // Create SFN client
 const sfnClient = new SFNClient({
   region: config.region,
 });
-
-/**
- * Submission parameters
- */
-export interface SubmissionParams {
-  username: string;
-  problemName: string;
-  language: string;
-  code: string;
-  codeA?: string; // For Communication problems
-  codeB?: string; // For Communication problems
-  contestId?: string; // Contest ID, defaults to "global" for admin submissions
-}
-
-/**
- * Submission result
- */
-export interface SubmissionResult {
-  success: boolean;
-  subId?: number;
-  error?: string;
-}
-
-/**
- * Submit code for grading
- */
-export async function submitForGrading(
-  params: SubmissionParams
-): Promise<SubmissionResult> {
-  const { username, problemName, language, code, codeA, codeB, contestId = "global" } = params;
-
-  // Validate language
-  if (!isValidLanguage(language)) {
-    return { success: false, error: `Unsupported language: ${language}` };
-  }
-
-  // Validate problem exists and is validated
-  const problem = await getProblem(problemName);
-  if (!problem) {
-    return { success: false, error: "Problem not found" };
-  }
-
-  if (!problem.validated) {
-    return { success: false, error: "Problem is not ready for submissions" };
-  }
-
-  // Validate code length
-  const maxCodeLength = 128000; // 128KB
-  const codeLength = Math.max(
-    code?.length || 0,
-    codeA?.length || 0,
-    codeB?.length || 0
-  );
-
-  if (codeLength > maxCodeLength) {
-    return { success: false, error: "Code is too long (max 128KB)" };
-  }
-
-  if (codeLength === 0) {
-    return { success: false, error: "Code cannot be empty" };
-  }
-
-  // Create submission based on problem type
-  let submission;
-
-  if (problem.problem_type === "Communication") {
-    if (!codeA || !codeB) {
-      return {
-        success: false,
-        error: "Communication problems require two source files",
-      };
-    }
-
-    submission = await createCommunicationSubmission(
-      username,
-      problemName,
-      language,
-      codeA,
-      codeB,
-      contestId,
-      problem.testcaseCount
-    );
-  } else {
-    if (!code) {
-      return { success: false, error: "Code is required" };
-    }
-
-    submission = await createSubmissionWithSource(
-      username,
-      problemName,
-      language,
-      code,
-      contestId,
-      problem.testcaseCount
-    );
-  }
-
-  // Start grading via Step Function
-  try {
-    await startGrading({
-      problemName,
-      submissionId: submission.subId,
-      username,
-      language,
-      problemType: problem.problem_type,
-    });
-
-    return { success: true, subId: submission.subId };
-  } catch (error) {
-    console.error("Failed to start grading:", error);
-    return {
-      success: false,
-      subId: submission.subId,
-      error: "Failed to start grading. Please try again.",
-    };
-  }
-}
 
 /**
  * Start grading via Step Function
@@ -184,18 +57,13 @@ export async function startGrading(params: {
     problemType,
   };
 
-  console.log("Starting Step Function:", STEP_FUNCTION_ARN);
-  console.log("Input:", JSON.stringify(input));
-
-  const result = await sfnClient.send(
+  await sfnClient.send(
     new StartExecutionCommand({
       stateMachineArn: STEP_FUNCTION_ARN,
       name: `sub-${submissionId}-${Date.now()}`,
       input: JSON.stringify(input),
     })
   );
-
-  console.log("Step Function started:", result.executionArn);
 }
 
 /**

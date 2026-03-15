@@ -5,8 +5,7 @@
  */
 
 import type { Submission } from "~/types/database";
-import { formatDateTime } from "~/types/database";
-import { createSubmissionWithSource } from "./db/submissions.server";
+import { createSubmissionWithSource, createCommunicationSubmission } from "./db/submissions.server";
 import { isUserInActiveContest } from "./contest.server";
 import { getProblem } from "./db/problems.server";
 
@@ -14,7 +13,9 @@ export interface SubmitSolutionParams {
   username: string;
   problemName: string;
   language: string;
-  code: string;
+  code?: string;
+  codeA?: string;
+  codeB?: string;
   contestId?: string;
 }
 
@@ -22,7 +23,7 @@ export interface SubmitSolutionParams {
  * Submit a solution for grading
  */
 export async function submitSolution(params: SubmitSolutionParams): Promise<Submission> {
-  const { username, problemName, language, code, contestId } = params;
+  const { username, problemName, language, code, codeA, codeB, contestId } = params;
 
   // Validate problem exists
   const problem = await getProblem(problemName);
@@ -52,16 +53,48 @@ export async function submitSolution(params: SubmitSolutionParams): Promise<Subm
     throw new Error(`Unsupported language: ${language}`);
   }
 
-  // Validate code
+  // Handle Communication problems
+  if (problem.problem_type === "Communication") {
+    if (!codeA || !codeA.trim() || !codeB || !codeB.trim()) {
+      throw new Error("Communication problems require both source files");
+    }
+
+    if (codeA.length > 1000000 || codeB.length > 1000000) {
+      throw new Error("Code is too large");
+    }
+
+    const submission = await createCommunicationSubmission(
+      username,
+      problemName,
+      language,
+      codeA,
+      codeB,
+      contestId || "global",
+      problem.testcaseCount
+    );
+
+    // Trigger grading via Step Function
+    const { startGrading } = await import("./grading.server");
+    await startGrading({
+      problemName,
+      submissionId: submission.subId,
+      username,
+      language,
+      problemType: problem.problem_type,
+    });
+
+    return submission;
+  }
+
+  // Handle regular problems (Batch/Interactive)
   if (!code || !code.trim()) {
     throw new Error("Code cannot be empty");
   }
 
-  if (code.length > 1000000) { // 1MB limit
+  if (code.length > 1000000) {
     throw new Error("Code is too large");
   }
 
-  // Create submission
   const submission = await createSubmissionWithSource(
     username,
     problemName,

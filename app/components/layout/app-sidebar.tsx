@@ -405,10 +405,10 @@ function ContestSection({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={isActive("/submissions")}
+                  isActive={isActive("/admin/submissions")}
                   tooltip="All Submissions"
                 >
-                  <Link to="/submissions">
+                  <Link to="/admin/submissions">
                     <Send />
                     <span>All Submissions</span>
                   </Link>
