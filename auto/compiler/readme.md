@@ -3,15 +3,22 @@ Codebreaker Compilation Server
 
 - Docker Container application built to run serverlessly on AWS Lambda for static compilation of C++ executables
 	+ Compiles code executables as part of grading State Machine
-	+ Compiles checker executables as part 
-- Performs compilation on Ubuntu 20.04 stable release in line with [IOI 2022 regulations](https://ioi2022.id/contest-environment/))
-- Containers are compiuled using AWS Code Build and exported to Elastic Container Registry (ECR)
+	+ Compiles checker executables for problem validation 
+- Performs compilation on Ubuntu 20.04 stable release in line with [IOI 2022 regulations](https://ioi2022.id/contest-environment/)
+- Containers are compiled using AWS CodeBuild and exported to Elastic Container Registry (ECR)
 
-### Repostiory Directory
-- `app.py`: Main application file for Lambda function
-- `awstools.py`: AWS tools file that manages S3 and dynamo interactions
-- `compilesub.py`: Main logic that compiles C++ codes
-- `compilechecker.py`: Main logic that compiles C++ checkers (admin side)
+### Repository Directory
+
+| File | Description |
+|------|-------------|
+| `app.py` | Lambda handler - routes compilation requests |
+| `awstools.py` | AWS utilities for S3 and DynamoDB interactions |
+| `compilesub.py` | Compiles user submissions (C++, Python, Java) |
+| `compilechecker.py` | Compiles problem checkers (admin side) |
+| `Dockerfile` | Ubuntu 20.04 base image with GCC, Python, Java |
+| `buildspec.yml` | AWS CodeBuild specification for building the Docker image |
+| `entry_script.sh` | Container entry point script |
+| `testlib.h` | Modified testlib.h for checker support |
 
 ### Checker Documentation
 
