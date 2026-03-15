@@ -26,7 +26,7 @@ Resources:
         TestcaseGraderWrapperFunctionArn: !Ref TestcaseGraderWrapperFunctionArn
         ProblemScorerFunctionArn: !Ref GraderProblemScorerFunctionArn
         JudgeName: !Ref JudgeName
-      Type: STANDARD
+      Type: EXPRESS
       Policies:
         - AWSLambdaRole
 

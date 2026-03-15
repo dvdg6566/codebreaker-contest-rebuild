@@ -571,12 +571,6 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
-            <Link to={`/problems/${problem.problemName}`} target="_blank">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              View Problem
-            </Link>
-          </Button>
           <Button onClick={handleSave} disabled={isLoading}>
             <Save className="mr-2 h-4 w-4" />
             Save Changes

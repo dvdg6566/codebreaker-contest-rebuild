@@ -48,7 +48,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { getUser } = await import("~/lib/db/users.server");
   const { getSubmissionSource, getCommunicationSource } = await import("~/lib/s3.server");
 
-  await requireAuth(request);
+  const currentUser = await requireAuth(request);
+  const userIsAdmin = currentUser.role === "admin";
 
   const subId = parseInt(params.subId, 10);
   if (isNaN(subId)) {
@@ -58,6 +59,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const submission = await getSubmission(subId);
   if (!submission) {
     throw new Response("Submission not found", { status: 404 });
+  }
+
+  // Permission check: users can only view their own submissions unless admin
+  if (!userIsAdmin && submission.username !== currentUser.username) {
+    throw new Response("You don't have permission to view this submission", { status: 403 });
   }
 
   const [problem, user] = await Promise.all([
@@ -147,10 +153,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       : submission.language;
 
   return {
+    isAdmin: userIsAdmin,
     submissionData: {
       id: submission.subId,
       username: submission.username,
       displayName: user?.fullname || submission.username,
+      contestId: submission.contestId,
       problem: problem?.title || submission.problemName,
       problemId: submission.problemName,
       problemType: problem?.problem_type || "Batch",
@@ -194,7 +202,7 @@ const verdictIcon = (verdict: string) => {
 };
 
 export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
-  const { submissionData } = loaderData;
+  const { submissionData, isAdmin } = loaderData;
   const revalidator = useRevalidator();
 
   useEffect(() => {
@@ -209,7 +217,7 @@ export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/submissions">
+            <Link to={isAdmin ? "/admin/submissions" : `/contests/${submissionData.contestId}/submissions`}>
               <ChevronLeft className="h-4 w-4 mr-1" />
               Back
             </Link>
@@ -226,7 +234,7 @@ export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
             </div>
             <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
               <Link
-                to={`/problems/${submissionData.problemId}`}
+                to={`/admin/problems/${submissionData.problemId}`}
                 className="hover:underline"
               >
                 {submissionData.problem}
@@ -454,7 +462,7 @@ export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
             </CardHeader>
             <CardContent className="space-y-2">
               <Button variant="outline" className="w-full justify-start" asChild>
-                <Link to={`/problems/${submissionData.problemId}`}>
+                <Link to={`/admin/problems/${submissionData.problemId}`}>
                   <Code2 className="h-4 w-4 mr-2" />
                   View Problem
                 </Link>

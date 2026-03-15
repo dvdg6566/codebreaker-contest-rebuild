@@ -30,7 +30,7 @@ export const problemColumns: ColumnDef<ProblemListItem>[] = [
       const problemName = row.getValue("problemName") as string;
       return (
         <Link
-          to={`/problems/${problemName}`}
+          to={`/admin/problems/${problemName}`}
           className="font-medium text-primary hover:underline"
         >
           {problemName}

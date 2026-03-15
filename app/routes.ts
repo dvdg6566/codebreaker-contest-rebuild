@@ -62,10 +62,6 @@ export default [
     // Profile and general routes
     route("profile/:username", "routes/profile.$username.tsx"),
 
-    // Global problems (admin-only)
-    route("problems", "routes/problems.tsx"),
-    route("problems/:problemId", "routes/problems.$problemId.tsx"),
-
     // Submission detail view
     route("submissions/:subId", "routes/submissions.$subId.tsx"),
 

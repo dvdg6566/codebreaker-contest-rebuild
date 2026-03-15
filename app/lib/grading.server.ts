@@ -26,6 +26,8 @@ const config = {
 // Step Function ARN
 const STEP_FUNCTION_ARN = `arn:aws:states:${config.region}:${config.accountId}:stateMachine:${config.judgeName}-grading`;
 
+console.log("Step Function ARN:", STEP_FUNCTION_ARN);
+
 // Create SFN client
 const sfnClient = new SFNClient({
   region: config.region,
@@ -182,15 +184,18 @@ export async function startGrading(params: {
     problemType,
   };
 
-  console.log("Starting Step Function:", JSON.stringify(input));
+  console.log("Starting Step Function:", STEP_FUNCTION_ARN);
+  console.log("Input:", JSON.stringify(input));
 
-  await sfnClient.send(
+  const result = await sfnClient.send(
     new StartExecutionCommand({
       stateMachineArn: STEP_FUNCTION_ARN,
       name: `sub-${submissionId}-${Date.now()}`,
       input: JSON.stringify(input),
     })
   );
+
+  console.log("Step Function started:", result.executionArn);
 }
 
 /**

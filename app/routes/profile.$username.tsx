@@ -290,7 +290,7 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
                             {String.fromCharCode(65 + index)}
                           </div>
                           <Link
-                            to={`/problems/${problemId}`}
+                            to={`/admin/problems/${problemId}`}
                             className="font-medium hover:underline"
                           >
                             {problemName}
