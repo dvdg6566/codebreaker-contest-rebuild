@@ -10,7 +10,7 @@ Codebreaker Contest System is a fork of the Codebreaker architecture that serves
 
 ## Codebreaker Statistics
 
-As of time of writing (Feb 2026), here are the statistics for [Codebreaker](https://codebreaker.xyz) (main site).
+As of time of writing (March 2026), here are the statistics for [Codebreaker](https://codebreaker.xyz) (main site).
 
 - Codebreaker receives an average of 400,000 to 500,000 monthly page requests (Excluding AI crawlers).
 - Codebreaker has graded a total of 800,000 submissions.
@@ -36,6 +36,7 @@ Codebreaker Contest is built on CI/CD tools and Infrastructure As Code (IaaC). T
    2. The submission is compiled with a custom **Ubuntu OS Docker container** that has GCC and Lambda installed.
       a. Lambda relies on the container being built in the user's **Elastic Container Repository (ECR)** instance. As such, CodeBuild will get the set-up scripts from Github and compile the container, before uploading it to ECR.
       b. The same tech stack is also used for compilation of checkers. As such, Codebreaker supports `testlib.h`, the industry-standard Competitive Programming checker and grader library.
+      c. Supports three problem types: **Batch** (standard I/O), **Interactive** (two-way communication), and **Communication** (two separate programs).
    3. Step Functions will concurrently invoke **wrapper Lambda functions** for testcase grading. This supports separation of permissions, allowing Lambda to function as a Sandbox for code execution before the wrapper will update the database. Note that the wrapper can have extremely **low memory allocation**, allowing for negligible compute costs.
    4. When all invocations have completed, a lambda function aggregates the testcase results and provides a final score.
 4. The main Codebreaker data storage uses **AWS DynamoDB** as a serverless database that stores user and problem data.
@@ -43,8 +44,20 @@ Codebreaker Contest is built on CI/CD tools and Infrastructure As Code (IaaC). T
 5. **AWS Simple Storage Service (S3)** is used for file storage for testdata and submissions.
    1. **S3 Lifecycle rules** are used to transfer testcases from older problems to infrequent access storage tier to save costs.
    2. Testdata is uploaded through the admin panel. For each problem, an **ephemeral IAM role** is created with appropriate permissions that allows `PutItem` access to a specific folder of the **testdata bucket**. **Security Token Service (STS)** is used to generate temporary AWS credentials that are passed to the front-end and uses the front-end SDK to upload the files. This allows for direct uploads to S3 with built-in **multipart uploads**.
-6. Contest announcements and notifications of incoming clarifications (for admins) is done through the use of **AWS API Gateway**. Front-end clients make SDK calls to an API Gateway **WebSocket endpoint**, which will be used to invoke the relevant notifications through AWS Lambda. This abstracts away web socket connections from the front-end server.
+6. Real-time notifications are delivered through **AWS API Gateway WebSocket**. The system supports four notification types:
+   - **Announcements** - Broadcast to all contest participants
+   - **Clarifications** - Admins notified of new questions, users notified when answered
+   - **Contest End** - Triggered by **AWS EventBridge Scheduler** for precise timing
+
+   Notifications are broadcast via **Step Functions** for parallel delivery to thousands of connections.
 7. User accounts and authentication are handled through **Amazon Cognito**. In the context of contests, all user accounts should be created by admins. Random credentials are generated, available for 1-time download and stored securely in an **Amazon Cognito User Pool**.
+8. **Multi-contest support** allows users to participate in multiple contests simultaneously. Each contest has its own:
+   - Problem set and scoreboard
+   - Submission history and scores
+   - Announcements and clarifications
+9. **Contest timing modes**:
+   - **Centralized** - All participants share the same start/end time
+   - **Self-timer** - Each participant has a fixed duration starting when they begin
 
 ## Getting Started
 
@@ -107,6 +120,16 @@ JUDGE_NAME=codebreakercontest01
 | bob      | P@55w0rd  | member |
 | charlie  | P@55w0rd  | member |
 | diana    | P@55w0rd  | member |
+
+### AWS Validation
+
+Verify all AWS resources are properly configured:
+
+```bash
+bun validate
+```
+
+This checks DynamoDB tables, S3 buckets, Lambda functions, IAM roles, Step Functions, and other infrastructure components.
 
 ## Limitations
 
