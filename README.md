@@ -33,12 +33,10 @@ Codebreaker Contest is built on CI/CD tools and Infrastructure As Code (IaaC). T
 2. The front-end web server is a **React Router 7** application with server-side rendering, deployed on an **AWS EC2** instance or containerized with **Docker**. The application uses **TypeScript**, **TailwindCSS**, and **shadcn/ui** components.
 3. Codebreaker's grading is performed serverlessly through an **AWS Step Functions** and **AWS Lambda** workflow. The steps are as follows:
    1. The submission is initialized and an entry created in DynamoDB.
-   2. The submission is compiled with a custom **Ubuntu OS Docker container** that has GCC and Lambda installed.
-      a. Lambda relies on the container being built in the user's **Elastic Container Repository (ECR)** instance. As such, CodeBuild will get the set-up scripts from Github and compile the container, before uploading it to ECR.
-      b. The same tech stack is also used for compilation of checkers. As such, Codebreaker supports `testlib.h`, the industry-standard Competitive Programming checker and grader library.
-      c. Supports three problem types: **Batch** (standard I/O), **Interactive** (two-way communication), and **Communication** (two separate programs).
-   3. Step Functions will concurrently invoke **wrapper Lambda functions** for testcase grading. This supports separation of permissions, allowing Lambda to function as a Sandbox for code execution before the wrapper will update the database. Note that the wrapper can have extremely **low memory allocation**, allowing for negligible compute costs.
-   4. When all invocations have completed, a lambda function aggregates the testcase results and provides a final score.
+   2. The submission is compiled with a custom **Ubuntu OS Docker container** that has GCC and Lambda installed. Lambda relies on the container being built in the user's **Elastic Container Repository (ECR)** instance. As such, CodeBuild will get the set-up scripts from Github and compile the container, before uploading it to ECR. The same tech stack is also used for compilation of checkers, supporting `testlib.h`, the industry-standard Competitive Programming checker and grader library.
+   3. Three problem types are supported: **Batch** (standard I/O), **Interactive** (two-way communication), and **Communication** (two separate programs).
+   4. Step Functions will concurrently invoke **wrapper Lambda functions** for testcase grading. This supports separation of permissions, allowing Lambda to function as a Sandbox for code execution before the wrapper will update the database. Note that the wrapper can have extremely **low memory allocation**, allowing for negligible compute costs.
+   5. When all invocations have completed, a lambda function aggregates the testcase results and provides a final score.
 4. The main Codebreaker data storage uses **AWS DynamoDB** as a serverless database that stores user and problem data.
    1. Website functionality is provided through DynamoDB **Global Secondary Indexes** for fast and robust queries.
 5. **AWS Simple Storage Service (S3)** is used for file storage for testdata and submissions.
