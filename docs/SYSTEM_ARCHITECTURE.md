@@ -1,7 +1,7 @@
 # Codebreaker Contest System - Complete Architecture Documentation
 
-**Version:** 2.0
-**Last Updated:** March 9, 2026
+**Version:** 2.1
+**Last Updated:** March 15, 2026
 **Status:** Production Ready
 
 ## Table of Contents
@@ -87,13 +87,15 @@ The application uses programmatic routing (not file-based) configured in `app/ro
 **Protected Routes (Layout):**
 - `/` - Home dashboard
 - `/contests` - Contest listing
-- `/problems` - Problem listing
-- `/problems/:problemId` - Problem details and submission
-- `/submissions` - Submission history
+- `/contests/:contestId` - Contest details and navigation
+- `/contests/:contestId/problems` - Contest problem listing
+- `/contests/:contestId/problem/:problemId` - Problem details and submission
+- `/contests/:contestId/submissions` - User's contest submission history
+- `/contests/:contestId/scoreboard` - Live contest rankings
+- `/contests/:contestId/announcements` - Contest announcements
+- `/contests/:contestId/clarifications` - Q&A with organizers
+- `/problems` - Global problem archive (non-contest)
 - `/submissions/:subId` - Submission details
-- `/scoreboard` - Live contest rankings
-- `/announcements` - Contest announcements
-- `/clarifications` - Q&A with organizers
 - `/profile/:username` - User profile
 
 **Admin Routes:**
@@ -145,9 +147,15 @@ interface User {
   fullname: string;                   // Display name
   email: string;                      // Contact email
   label: string;                      // Custom categorization tag
-  contest: string;                    // Currently assigned contest
-  problemScores: Record<string, number>;        // Best scores per problem
-  problemSubmissions: Record<string, number>;   // Submission counts per problem
+
+  // Multi-contest support
+  activeContests: string[];           // List of contest IDs user is participating in
+  contestScores: Record<string, Record<string, number>>;  // {contestId: {problemName: score}}
+  contestSubmissions: Record<string, Record<string, number>>; // {contestId: {problemName: count}}
+
+  // Global (non-contest) tracking
+  problemScores: Record<string, number>;        // Best scores per problem (global)
+  problemSubmissions: Record<string, number>;   // Submission counts per problem (global)
   latestSubmissions: Record<string, string>;    // Latest submission times
   latestScoreChange: string;          // Timestamp of last score update
 }
@@ -216,13 +224,17 @@ interface Problem {
 
 **Table Name:** `{judgeName}-submissions`
 **Primary Key:** `subId` (auto-incremented number)
-**GSI:** `usernameIndex` (username), `problemIndex` (problemName)
+**GSIs:**
+- `usernameIndex` (PK: username) - Query user's submissions
+- `problemIndex` (PK: problemName) - Query submissions by problem
+- `contestUserIndex` (PK: contestId, SK: username) - Query user's submissions within a contest
 
 ```typescript
 interface Submission {
   subId: number;                     // PK: Auto-incremented submission ID
   username: string;                  // Submitter username
   problemName: string;               // Problem identifier
+  contestId: string;                 // Contest identifier ("global" for non-contest)
   submissionTime: string;            // Submission time (UTC)
   gradingTime?: string;              // When grading started
   gradingCompleteTime: string;       // When grading completed
@@ -245,10 +257,12 @@ interface Submission {
 
 **Table Name:** `{judgeName}-announcements`
 **Primary Key:** `announcementId`
+**GSI:** `contestIdIndex` (PK: contestId) - Query announcements by contest
 
 ```typescript
 interface Announcement {
   announcementId: string;            // PK: UUID
+  contestId: string;                 // Contest this announcement belongs to
   title: string;                     // Announcement title
   text: string;                      // Announcement content
   announcementTime: string;          // Posted time (UTC)
@@ -261,11 +275,13 @@ interface Announcement {
 
 **Table Name:** `{judgeName}-clarifications`
 **Primary Key:** `askedBy`, **Sort Key:** `clarificationTime`
+**GSI:** `contestIdIndex` (PK: contestId) - Query clarifications by contest
 
 ```typescript
 interface Clarification {
   askedBy: string;                   // PK: Username who asked
   clarificationTime: string;         // SK: Time asked (UTC)
+  contestId: string;                 // Contest this clarification belongs to
   problemName: string;               // Related problem (or "" for general)
   question: string;                  // Question text
   answer: string;                    // Answer text ("" if pending)
@@ -294,13 +310,16 @@ interface GlobalCounter {
 
 **Table Name:** `{judgeName}-websocket`
 **Primary Key:** `connectionId`
-**GSI:** `accountRoleUsernameIndex` (PK: `accountRole`, SK: `username`)
+**GSIs:**
+- `accountRoleUsernameIndex` (PK: accountRole, SK: username) - Query connections by role
+- `contestIdUsernameIndex` (PK: contestId, SK: username) - Query connections by contest
 
 ```typescript
 interface WebSocketConnection {
   connectionId: string;              // PK: API Gateway connection ID
   username: string;                  // Connected user
   accountRole: "admin" | "member";   // User role for targeted messaging
+  contestId: string;                 // Currently viewed contest (for contest-scoped notifications)
   expiryTime: number;                // TTL for automatic cleanup
 }
 ```
@@ -470,7 +489,30 @@ All Lambda functions use Python 3.9 runtime and follow the naming pattern `{judg
 2. Sends notification to each connection via API Gateway
 3. Removes stale connections from DynamoDB
 
-#### 4.4.3 CodeBuild Trigger (`codebuild-trigger`)
+#### 4.4.3 Contest End Notifier (`contest-end-notifier`)
+
+**Purpose:** Broadcasts contest end notifications to connected users
+**Trigger:** AWS EventBridge Scheduler at contest end time
+**Runtime:** Python 3.9
+
+**Process:**
+1. Receives contest end event with contestId and mode
+2. Queries WebSocket connections table using contestIdUsernameIndex GSI
+3. Batches connections into groups of 100
+4. Invokes WebSocket Step Function for parallel broadcasting
+
+**Input:**
+```json
+{
+  "contestId": "mycontest",
+  "mode": "centralized",
+  "username": null
+}
+```
+
+For self-timer mode, `username` specifies the individual user whose time has ended.
+
+#### 4.4.4 CodeBuild Trigger (`codebuild-trigger`)
 
 **Purpose:** Custom CloudFormation resource for automated compiler deployment
 **Trigger:** CloudFormation stack creation/update
@@ -558,9 +600,12 @@ End
 ```
 
 **Notification Types:**
-- `announce`: General announcements to all users
-- `postClarification`: New clarification notifications to admins
-- `answerClarification`: Clarification answer notifications to specific users
+| Type | Target | Description |
+|------|--------|-------------|
+| `announce` | All contest users | New contest announcement posted |
+| `postClarification` | Admins | User asked a new clarification question |
+| `answerClarification` | Specific user | Admin answered user's clarification |
+| `endContest` | Contest users | Contest has ended (centralized or self-timer)
 
 ---
 
@@ -575,11 +620,12 @@ The system uses AWS API Gateway WebSocket for real-time communication focused on
 - **Connection Management:** DynamoDB table with TTL for automatic cleanup
 
 **Scope of Real-time Updates:**
-- ✅ Contest announcements to all users
+- ✅ Contest announcements to all contest participants
 - ✅ New clarification notifications to admins
 - ✅ Clarification answer notifications to users
-- ❌ Live scoreboard updates (requires page refresh)
-- ❌ Submission results (requires page refresh)
+- ✅ Contest end notifications (centralized and self-timer)
+- ❌ Live scoreboard updates (auto-refreshes every 30s during contest)
+- ❌ Submission results (auto-refreshes every 3s while grading)
 
 ### 6.2 Broadcast Service
 
@@ -606,12 +652,84 @@ Authenticate via JWT
   ↓
 Store in DynamoDB with TTL
   ↓
-Real-time announcements/clarifications
+Client sends contestId registration
+  ↓
+Real-time notifications (announcements, clarifications, contest end)
   ↓
 Automatic cleanup on disconnect/TTL
 ```
 
 **Security:** All WebSocket connections require valid JWT authentication token.
+
+### 6.4 Frontend Integration
+
+**WebSocket Context:** `app/context/websocket-context.tsx`
+
+The WebSocket context provider manages connection state and notification handling:
+
+```typescript
+interface WebSocketContextValue {
+  isConnected: boolean;
+  notifications: Notification[];
+  setContestId: (contestId: string) => void;
+  clearNotifications: () => void;
+}
+```
+
+**Contest Registration Hook:** `app/hooks/useContestWebSocket.ts`
+
+All contest routes must register the current contest with the WebSocket:
+
+```typescript
+import { useContestWebSocket } from "~/hooks/useContestWebSocket";
+
+export default function ContestPage({ loaderData }) {
+  const { contest } = loaderData;
+
+  // Register contest with WebSocket for scoped notifications
+  useContestWebSocket(contest.contestId);
+
+  return <div>...</div>;
+}
+```
+
+**Notification Components:**
+- `app/components/layout/notification-bell.tsx` - Header notification icon with dropdown
+- `app/components/ui/notification-toast.tsx` - Toast popups for real-time alerts
+
+**Supported Notification Types:**
+| Type | Icon | Description |
+|------|------|-------------|
+| `announce` | Megaphone | New announcement posted |
+| `postClarification` | HelpCircle | New clarification (admin only) |
+| `answerClarification` | MessageSquare | Clarification answered |
+| `endContest` | Timer | Contest has ended |
+
+### 6.5 Contest End Notifications
+
+Contest end notifications are triggered by AWS EventBridge Scheduler for precise timing:
+
+**Components:**
+- **EventBridge Schedule Group:** `{judgeName}-contest-end`
+- **contest-end-notifier Lambda:** Invoked at contest end, broadcasts to relevant connections
+- **Scheduler Role:** IAM role allowing Scheduler to invoke the notifier Lambda
+
+**Flow:**
+```
+Contest created/updated → App schedules EventBridge event
+  ↓
+EventBridge fires at contest endTime
+  ↓
+contest-end-notifier Lambda queries contestIdUsernameIndex GSI
+  ↓
+Batches connections and invokes websocket Step Function
+  ↓
+Users receive endContest notification
+```
+
+**Scheduling Functions:** `app/lib/scheduler.server.ts`
+- `scheduleContestEnd(contestId, endTime, mode, username?)` - Create end notification schedule
+- `cancelContestEndSchedule(contestId, username?)` - Cancel existing schedule
 
 ---
 
@@ -921,10 +1039,14 @@ All AWS resources follow consistent naming patterns:
 - `{judgeName}-regrade-problem`
 - `{judgeName}-websocket-connections`
 - `{judgeName}-websocket-invoke`
+- `{judgeName}-contest-end-notifier`
 
 **Step Functions:**
 - `{judgeName}-grading`
 - `{judgeName}-websocket`
+
+**EventBridge:**
+- `{judgeName}-contest-end` - Schedule group for contest end notifications
 
 **S3 Buckets:**
 - `{judgeName}-submissions`

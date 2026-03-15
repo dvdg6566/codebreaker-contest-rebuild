@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { ScoreBadge } from "~/components/ui/score-badge";
+import { useContestWebSocket } from "~/hooks/useContestWebSocket";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { contestId } = params;
@@ -43,6 +44,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export default function ContestProblems({ loaderData }: Route.ComponentProps) {
   const { contest, problems, userScores, contestStatus, user } = loaderData;
+
+  useContestWebSocket(contest.contestId);
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);

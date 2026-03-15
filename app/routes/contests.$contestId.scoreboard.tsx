@@ -1,6 +1,7 @@
 import type { Route } from "./+types/contests.$contestId.scoreboard";
 import { Link, useRevalidator } from "react-router";
 import { useEffect } from "react";
+import { useContestWebSocket } from "~/hooks/useContestWebSocket";
 import { Trophy, Medal, Award, Clock, Target } from "lucide-react";
 import type { ScoreboardEntry } from "~/lib/db/scoreboard.server";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -64,6 +65,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 export default function ContestScoreboard({ loaderData }: Route.ComponentProps) {
   const { contest, user, scoreboard } = loaderData;
   const revalidator = useRevalidator();
+
+  useContestWebSocket(contest.contestId);
 
   // Check if contest is still ongoing for auto-refresh
   const isContestOngoing = (() => {

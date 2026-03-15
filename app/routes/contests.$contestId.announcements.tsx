@@ -1,5 +1,6 @@
 import type { Route } from "./+types/contests.$contestId.announcements";
 import { Link } from "react-router";
+import { useContestWebSocket } from "~/hooks/useContestWebSocket";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { contestId } = params;
@@ -30,6 +31,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export default function ContestAnnouncements({ loaderData }: Route.ComponentProps) {
   const { contest, user, announcements } = loaderData;
+
+  useContestWebSocket(contest.contestId);
 
   const typeConfig = {
     important: {

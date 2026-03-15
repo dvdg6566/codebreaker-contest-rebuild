@@ -1,6 +1,7 @@
 import type { Route } from "./+types/contests.$contestId.problem.$problemId";
 import { Link, Form, useFetcher, useRevalidator, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
+import { useContestWebSocket } from "~/hooks/useContestWebSocket";
 import {
   ChevronLeft,
   Clock,
@@ -281,6 +282,8 @@ export default function ContestProblem({ loaderData, actionData }: Route.Compone
   const revalidator = useRevalidator();
   const navigate = useNavigate();
   const isCommunication = problem.problem_type === "Communication";
+
+  useContestWebSocket(contest.contestId);
 
   // Redirect to submission page after successful submit
   useEffect(() => {

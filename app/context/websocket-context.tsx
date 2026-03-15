@@ -94,7 +94,7 @@ function createNotificationFromMessage(
         message: "A new announcement has been posted",
         timestamp,
         read: false,
-        href: "/announcements",
+        href: currentContestId ? `/contests/${currentContestId}/announcements` : "/contests",
       };
     }
 
@@ -120,7 +120,7 @@ function createNotificationFromMessage(
         message: "Your question has been answered",
         timestamp,
         read: false,
-        href: "/clarifications",
+        href: currentContestId ? `/contests/${currentContestId}/clarifications` : "/contests",
       };
     }
 

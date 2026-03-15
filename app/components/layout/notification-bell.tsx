@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router";
-import { Bell, Megaphone, MessageSquare, CheckCircle, X, Check } from "lucide-react";
+import { Bell, Megaphone, MessageSquare, CheckCircle, X, Check, Timer } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import {
@@ -37,6 +37,12 @@ function getNotificationStyles(type: Notification["type"]) {
         bgColor: "bg-blue-100",
         iconColor: "text-blue-600",
         Icon: CheckCircle,
+      };
+    case "endContest":
+      return {
+        bgColor: "bg-red-100",
+        iconColor: "text-red-600",
+        Icon: Timer,
       };
     default:
       return {

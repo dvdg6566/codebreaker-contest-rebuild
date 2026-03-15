@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { X, Megaphone, MessageSquare, CheckCircle } from "lucide-react";
+import { X, Megaphone, MessageSquare, CheckCircle, Timer } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { useNotifications, type Notification } from "~/context/websocket-context";
 
@@ -37,6 +37,14 @@ function getToastStyles(type: Notification["type"]) {
         iconBg: "bg-blue-100",
         iconColor: "text-blue-600",
         Icon: CheckCircle,
+      };
+    case "endContest":
+      return {
+        borderColor: "border-l-red-500",
+        bgColor: "bg-red-50",
+        iconBg: "bg-red-100",
+        iconColor: "text-red-600",
+        Icon: Timer,
       };
     default:
       return {

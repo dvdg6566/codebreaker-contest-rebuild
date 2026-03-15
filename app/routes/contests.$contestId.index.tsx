@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { useCountdown, formatTime } from "~/hooks/useCountdown";
+import { useContestWebSocket } from "~/hooks/useContestWebSocket";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { contestId } = params;
@@ -76,6 +77,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 
 export default function ContestIndex({ loaderData, actionData }: Route.ComponentProps) {
   const { contest, contestStatus, userScores, problemCount, user } = loaderData;
+
+  // Register contest with WebSocket for notifications
+  useContestWebSocket(contest.contestId);
 
   // Use countdown hook for real-time updates when contest is active
   const timeRemaining = useCountdown(contestStatus.timeRemaining || 0);

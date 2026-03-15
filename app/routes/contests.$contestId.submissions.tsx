@@ -1,6 +1,7 @@
 import type { Route } from "./+types/contests.$contestId.submissions";
 import { Link, useRevalidator } from "react-router";
 import { useEffect } from "react";
+import { useContestWebSocket } from "~/hooks/useContestWebSocket";
 import {
   Clock,
   Code2,
@@ -92,6 +93,8 @@ const verdictIcon = (verdict: string) => {
 export default function ContestSubmissions({ loaderData }: Route.ComponentProps) {
   const { contest, user, submissions, problemDetails } = loaderData;
   const revalidator = useRevalidator();
+
+  useContestWebSocket(contest.contestId);
 
   // Auto-refresh if there are pending submissions
   useEffect(() => {

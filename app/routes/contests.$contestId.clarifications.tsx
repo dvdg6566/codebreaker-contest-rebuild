@@ -1,5 +1,6 @@
 import type { Route } from "./+types/contests.$contestId.clarifications";
 import { Link, data } from "react-router";
+import { useContestWebSocket } from "~/hooks/useContestWebSocket";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { contestId } = params;
@@ -42,6 +43,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "create") {
     const { requireContestAccess } = await import("~/lib/auth.server");
     const { createClarification } = await import("~/lib/db/clarifications.server");
+    const { postClarification } = await import("~/lib/websocket-broadcast.server");
 
     const session = await requireContestAccess(request, contestId);
 
@@ -59,6 +61,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       problemName || undefined
     );
 
+    // Notify admins of new clarification
+    await postClarification();
+
     return { success: true };
   }
 
@@ -67,6 +72,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 
 export default function ContestClarifications({ loaderData }: Route.ComponentProps) {
   const { contest, user, clarifications } = loaderData;
+
+  useContestWebSocket(contest.contestId);
 
   return (
     <div className="space-y-6">

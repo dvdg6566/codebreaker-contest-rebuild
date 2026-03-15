@@ -1,6 +1,6 @@
 # Database Queries Documentation
 
-> Last updated: 2026-02-23
+> Last updated: 2026-03-15
 
 This document lists all DynamoDB queries performed per page in the Codebreaker Contest application.
 
@@ -31,49 +31,105 @@ User login page.
 
 ---
 
-### Problems (`/problems`)
-**Route:** `app/routes/problems.tsx`
+### Contests (`/contests`)
+**Route:** `app/routes/contests.tsx`
+
+Contest listing for user.
+
+| Phase | Queries |
+|-------|---------|
+| Loader | `requireAuth()`, `getUserContests(username)` |
+
+---
+
+### Contest Overview (`/contests/:contestId`)
+**Route:** `app/routes/contests.$contestId.index.tsx`
+
+Contest dashboard with overview information.
+
+| Phase | Queries |
+|-------|---------|
+| Loader | `requireContestAccess(username, contestId)`, `getContest(contestId)` |
+
+---
+
+### Contest Problems (`/contests/:contestId/problems`)
+**Route:** `app/routes/contests.$contestId.problems.tsx`
 
 Contest problems list for participants.
 
 | Phase | Queries |
 |-------|---------|
-| Loader | `requireAuth()`, `isUserInActiveContest(username)`, `getScoreboard(contestId)`, `getProblemsForContest(problemNames)` |
-| Action | `startUserContest(username, contestId)` |
+| Loader | `requireContestAccess(username, contestId)`, `getContest(contestId)`, `getProblemsForContest(problemNames)`, `getScoreboard(contestId)` |
+| Action | `startUserContest(username, contestId)` (self-timer mode) |
 
 ---
 
-### Submissions (`/submissions`)
-**Route:** `app/routes/submissions.tsx`
+### Problem View (`/contests/:contestId/problem/:problemId`)
+**Route:** `app/routes/contests.$contestId.problem.$problemId.tsx`
 
-User's submission history.
+Problem statement and submission form.
 
 | Phase | Queries |
 |-------|---------|
-| Loader | `requireAuth()`, `isUserInActiveContest(username)`, `getSubmissionsByUser(username)`, `getProblemsForContest(problemNames)` |
+| Loader | `requireContestAccess(username, contestId)`, `getContest(contestId)`, `getProblem(problemId)`, `getSubmissionsByContestAndUser(contestId, username)` |
+| Action | `createSubmission(...)`, `triggerGrading(submissionId)` |
 
 ---
 
-### Scoreboard (`/scoreboard`)
-**Route:** `app/routes/scoreboard.tsx`
+### Contest Submissions (`/contests/:contestId/submissions`)
+**Route:** `app/routes/contests.$contestId.submissions.tsx`
+
+User's submission history for a contest.
+
+| Phase | Queries |
+|-------|---------|
+| Loader | `requireContestAccess(username, contestId)`, `getContest(contestId)`, `getSubmissionsByContestAndUser(contestId, username)` |
+
+---
+
+### Contest Scoreboard (`/contests/:contestId/scoreboard`)
+**Route:** `app/routes/contests.$contestId.scoreboard.tsx`
 
 Contest scoreboard/rankings.
 
 | Phase | Queries |
 |-------|---------|
-| Loader | `requireAuth()`, `isUserInActiveContest(username)`, `getProblemsForContest(problemNames)`, `getScoreboard(contestId)` |
+| Loader | `requireAuth()`, `canUserAccessContest(username, contestId)`, `getContest(contestId)`, `getScoreboard(contestId)` |
 
 ---
 
-### Clarifications (`/clarifications`)
-**Route:** `app/routes/clarifications.tsx`
+### Contest Announcements (`/contests/:contestId/announcements`)
+**Route:** `app/routes/contests.$contestId.announcements.tsx`
 
-User's clarification requests.
+Contest announcements for participants.
 
 | Phase | Queries |
 |-------|---------|
-| Loader | `getCurrentUser()`, `getClarificationsByUser(username)`, `listValidatedProblems()` |
-| Action | `createClarification(username, question, problemName)` |
+| Loader | `requireContestAccess(username, contestId)`, `getContest(contestId)`, `getAnnouncementsByContest(contestId)` |
+
+---
+
+### Contest Clarifications (`/contests/:contestId/clarifications`)
+**Route:** `app/routes/contests.$contestId.clarifications.tsx`
+
+User's clarification requests for a contest.
+
+| Phase | Queries |
+|-------|---------|
+| Loader | `requireContestAccess(username, contestId)`, `getContest(contestId)`, `getClarificationsByUserAndContest(username, contestId)` |
+| Action | `createClarification(username, question, contestId, problemName)` |
+
+---
+
+### Global Problems (`/problems`)
+**Route:** `app/routes/problems.tsx`
+
+Problem archive (non-contest practice).
+
+| Phase | Queries |
+|-------|---------|
+| Loader | `requireAuth()`, `listValidatedProblems()` |
 
 ---
 
@@ -190,10 +246,12 @@ Problem testdata management.
 ### Announcements
 **File:** `app/lib/db/announcements.server.ts`
 **Table:** `{JudgeName}-announcements`
+**GSI:** `contestIdIndex` (PK: contestId)
 
 | Function | Description | Used By |
 |----------|-------------|---------|
 | `listAnnouncements()` | List all | admin/announcements |
+| `getAnnouncementsByContest(contestId)` | List by contest | contests.$contestId.announcements |
 | `createAnnouncement(...)` | Create new | admin/announcements |
 | `updateAnnouncement(id, updates)` | Update by ID | admin/announcements |
 | `deleteAnnouncement(id)` | Delete by ID | admin/announcements |
@@ -201,12 +259,13 @@ Problem testdata management.
 ### Clarifications
 **File:** `app/lib/db/clarifications.server.ts`
 **Table:** `{JudgeName}-clarifications`
+**GSI:** `contestIdIndex` (PK: contestId)
 
 | Function | Description | Used By |
 |----------|-------------|---------|
 | `listClarifications()` | List all | admin/clarifications |
-| `getClarificationsByUser(username)` | List by user | clarifications |
-| `createClarification(...)` | Create new | clarifications |
+| `getClarificationsByUserAndContest(username, contestId)` | List by user and contest | contests.$contestId.clarifications |
+| `createClarification(...)` | Create new | contests.$contestId.clarifications |
 | `answerClarification(...)` | Answer clarification | admin/clarifications |
 
 ### Contests
@@ -225,11 +284,14 @@ Problem testdata management.
 ### Submissions
 **File:** `app/lib/db/submissions.server.ts`
 **Table:** `{JudgeName}-submissions`
+**GSIs:** `usernameIndex` (PK: username), `problemIndex` (PK: problemName), `contestUserIndex` (PK: contestId, SK: username)
 
 | Function | Description | Used By |
 |----------|-------------|---------|
-| `getSubmissionsByUser(username)` | Get user's submissions | submissions |
-| `formatSubmissionForDisplay(sub)` | Transform for UI | submissions |
+| `getSubmissionsByUser(username)` | Get user's global submissions | problems |
+| `getSubmissionsByContestAndUser(contestId, username)` | Get user's contest submissions | contests.$contestId.submissions, contests.$contestId.problem.$problemId |
+| `createSubmission(...)` | Create new submission | contests.$contestId.problem.$problemId |
+| `formatSubmissionForDisplay(sub)` | Transform for UI | various |
 
 ### Scoreboard
 **File:** `app/lib/db/scoreboard.server.ts`
@@ -239,36 +301,40 @@ Problem testdata management.
 |----------|-------------|---------|
 | `getScoreboard(contestId)` | Build scoreboard | problems, scoreboard |
 
-### Contest Helper
-**File:** `app/lib/contest.server.ts`
-**Table:** `{JudgeName}-contests`
-
-| Function | Description | Used By |
-|----------|-------------|---------|
-| `isUserInActiveContest(username)` | Check active session | problems, submissions, scoreboard |
-| `startUserContest(username, contestId)` | Start timer (self-timer) | problems |
-
 ### Auth
 **File:** `app/lib/auth.server.ts`
 **Table:** `{JudgeName}-users`
 
 | Function | Description | Used By |
 |----------|-------------|---------|
-| `getCurrentUser()` | Get user from session | login, clarifications, layout |
-| `requireAuth()` | Require authenticated user | layout, problems, submissions, scoreboard |
+| `getCurrentUser()` | Get user from session | login, layout |
+| `requireAuth()` | Require authenticated user | layout, problems |
 | `requireAdmin()` | Require admin role | layout (/admin/*), admin pages |
+| `requireContestAccess(username, contestId)` | Require user has access to contest | contest routes |
 | `login(username, password)` | Authenticate user | login |
+
+### Contest Helper
+**File:** `app/lib/contest.server.ts`
+**Table:** `{JudgeName}-contests`
+
+| Function | Description | Used By |
+|----------|-------------|---------|
+| `getContest(contestId)` | Get contest by ID | contest routes |
+| `canUserAccessContest(username, contestId)` | Check if user can access contest | contests.$contestId.scoreboard |
+| `startUserContest(username, contestId)` | Start self-timer | contests.$contestId.problems |
+| `getUserContests(username)` | Get user's active contests | contests |
 
 ---
 
 ## DynamoDB Tables
 
-| Table | Primary Key | Description |
-|-------|-------------|-------------|
-| `{JudgeName}-users` | `username` | User accounts |
-| `{JudgeName}-problems` | `problemName` | Problem definitions |
-| `{JudgeName}-contests` | `contestId` | Contest configurations and scores |
-| `{JudgeName}-submissions` | `subId` (GSI: `username-index`) | User submissions |
-| `{JudgeName}-announcements` | `announcementId` | Contest announcements |
-| `{JudgeName}-clarifications` | `askedBy` + `clarificationTime` | Clarification requests |
-| `{JudgeName}-global-counters` | `counterId` | Auto-increment counters |
+| Table | Primary Key | GSIs | Description |
+|-------|-------------|------|-------------|
+| `{JudgeName}-users` | `username` | - | User accounts |
+| `{JudgeName}-problems` | `problemName` | - | Problem definitions |
+| `{JudgeName}-contests` | `contestId` | - | Contest configurations and scores |
+| `{JudgeName}-submissions` | `subId` | `usernameIndex`, `problemIndex`, `contestUserIndex` | User submissions |
+| `{JudgeName}-announcements` | `announcementId` | `contestIdIndex` | Contest announcements |
+| `{JudgeName}-clarifications` | `askedBy` + `clarificationTime` | `contestIdIndex` | Clarification requests |
+| `{JudgeName}-websocket` | `connectionId` | `accountRoleUsernameIndex`, `contestIdUsernameIndex` | WebSocket connections |
+| `{JudgeName}-global-counters` | `counterId` | - | Auto-increment counters |
