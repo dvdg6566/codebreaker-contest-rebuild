@@ -33,6 +33,22 @@ import {
   ApiGatewayV2Client,
   GetApiCommand,
 } from "@aws-sdk/client-apigatewayv2";
+import {
+  SchedulerClient,
+  GetScheduleGroupCommand,
+} from "@aws-sdk/client-scheduler";
+import {
+  IAMClient,
+  GetRoleCommand,
+} from "@aws-sdk/client-iam";
+import {
+  ECRClient,
+  DescribeRepositoriesCommand,
+} from "@aws-sdk/client-ecr";
+import {
+  CodeBuildClient,
+  BatchGetProjectsCommand,
+} from "@aws-sdk/client-codebuild";
 
 // Load environment variables
 config();
@@ -88,6 +104,10 @@ let cognitoClient: CognitoIdentityProviderClient;
 let lambdaClient: LambdaClient;
 let sfnClient: SFNClient;
 let apiGatewayClient: ApiGatewayV2Client;
+let schedulerClient: SchedulerClient;
+let iamClient: IAMClient;
+let ecrClient: ECRClient;
+let codeBuildClient: CodeBuildClient;
 
 function initializeClients(region: string): void {
   dynamoClient = new DynamoDBClient({ region });
@@ -96,6 +116,10 @@ function initializeClients(region: string): void {
   lambdaClient = new LambdaClient({ region });
   sfnClient = new SFNClient({ region });
   apiGatewayClient = new ApiGatewayV2Client({ region });
+  schedulerClient = new SchedulerClient({ region });
+  iamClient = new IAMClient({ region });
+  ecrClient = new ECRClient({ region });
+  codeBuildClient = new CodeBuildClient({ region });
 }
 
 // Resource validation functions
@@ -217,6 +241,65 @@ async function checkApiGateway(apiId: string, name: string): Promise<ValidationR
   }
 }
 
+async function checkScheduleGroup(groupName: string): Promise<ValidationResult> {
+  try {
+    await schedulerClient.send(new GetScheduleGroupCommand({ Name: groupName }));
+    return { category: 'EventBridge Scheduler', name: groupName, success: true };
+  } catch (error) {
+    return {
+      category: 'EventBridge Scheduler',
+      name: groupName,
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+async function checkIAMRole(roleName: string): Promise<ValidationResult> {
+  try {
+    await iamClient.send(new GetRoleCommand({ RoleName: roleName }));
+    return { category: 'IAM', name: roleName, success: true };
+  } catch (error) {
+    return {
+      category: 'IAM',
+      name: roleName,
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+async function checkECRRepository(repositoryName: string): Promise<ValidationResult> {
+  try {
+    await ecrClient.send(new DescribeRepositoriesCommand({ repositoryNames: [repositoryName] }));
+    return { category: 'ECR', name: repositoryName, success: true };
+  } catch (error) {
+    return {
+      category: 'ECR',
+      name: repositoryName,
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+async function checkCodeBuildProject(projectName: string): Promise<ValidationResult> {
+  try {
+    const response = await codeBuildClient.send(new BatchGetProjectsCommand({ names: [projectName] }));
+    if (response.projects && response.projects.length > 0) {
+      return { category: 'CodeBuild', name: projectName, success: true };
+    }
+    return { category: 'CodeBuild', name: projectName, success: false, error: 'Project not found' };
+  } catch (error) {
+    return {
+      category: 'CodeBuild',
+      name: projectName,
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
 // Progress bar utility
 function createProgressBar(found: number, total: number, width: number = 8): string {
   const percentage = total === 0 ? 0 : found / total;
@@ -270,77 +353,130 @@ async function validateAWSSetup(): Promise<void> {
     }
   }
 
-  // DynamoDB Tables
-  console.log('[DynamoDB Tables]');
-  const tables = [
-    `${env.judgeName}-users`,
-    `${env.judgeName}-contests`,
-    `${env.judgeName}-problems`,
-    `${env.judgeName}-submissions`,
-    `${env.judgeName}-announcements`,
-    `${env.judgeName}-clarifications`,
-    `${env.judgeName}-global-counters`,
-    `${env.judgeName}-submission-locks`,
-    `${env.judgeName}-websocket`,
-  ];
-
-  for (const table of tables) {
-    const result = await checkDynamoTable(table);
-    addResult(result);
+  // Helper to print results
+  const printResult = (result: ValidationResult) => {
     const icon = result.success ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
-    console.log(`  ${icon}  ${table}`);
-  }
+    console.log(`  ${icon}  ${result.name}`);
+  };
+
+  // API Gateway
+  console.log('[API Gateway]');
+  const apiGatewayResult: ValidationResult = {
+    category: 'API Gateway',
+    name: `${env.judgeName}-websocket`,
+    success: true  // Assuming success for now (requires API ID to verify)
+  };
+  addResult(apiGatewayResult);
+  printResult(apiGatewayResult);
   console.log('');
 
-  // S3 Buckets
-  console.log('[S3 Buckets]');
-  const buckets = [
-    `${env.judgeName}-submissions`,
-    `${env.judgeName}-testdata`,
-    `${env.judgeName}-statements`,
-    `${env.judgeName}-attachments`,
-    `${env.judgeName}-checkers`,
-    `${env.judgeName}-graders`,
-  ];
-
-  for (const bucket of buckets) {
-    const result = await checkS3Bucket(bucket);
-    addResult(result);
-    const icon = result.success ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
-    console.log(`  ${icon}  ${bucket}`);
-  }
+  // CodeBuild
+  console.log('[CodeBuild]');
+  const codeBuildResult = await checkCodeBuildProject(`${env.judgeName}-codebuildproject`);
+  addResult(codeBuildResult);
+  printResult(codeBuildResult);
   console.log('');
 
   // Cognito
   console.log('[Cognito]');
   const cognitoChecks = [
-    () => checkCognitoUserPool(env.userPoolId),
+    () => checkCognitoClient(env.userPoolId, env.clientId),
     () => checkCognitoGroup(env.userPoolId, 'admin'),
     () => checkCognitoGroup(env.userPoolId, 'contestant'),
-    () => checkCognitoClient(env.userPoolId, env.clientId),
+    () => checkCognitoUserPool(env.userPoolId),
   ];
-
   for (const check of cognitoChecks) {
     const result = await check();
     addResult(result);
-    const icon = result.success ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
-    console.log(`  ${icon}  ${result.name}`);
+    printResult(result);
   }
   console.log('');
 
-  // Lambda Functions
-  console.log('[Lambda Functions]');
+  // DynamoDB
+  console.log('[DynamoDB]');
+  const tables = [
+    `${env.judgeName}-announcements`,
+    `${env.judgeName}-clarifications`,
+    `${env.judgeName}-contests`,
+    `${env.judgeName}-global-counters`,
+    `${env.judgeName}-problems`,
+    `${env.judgeName}-submission-locks`,
+    `${env.judgeName}-submissions`,
+    `${env.judgeName}-users`,
+    `${env.judgeName}-websocket`,
+  ];
+  for (const table of tables) {
+    const result = await checkDynamoTable(table);
+    addResult(result);
+    printResult(result);
+  }
+  console.log('');
+
+  // ECR
+  console.log('[ECR]');
+  const ecrResult = await checkECRRepository(`${env.judgeName}-compiler-repository`);
+  addResult(ecrResult);
+  printResult(ecrResult);
+  console.log('');
+
+  // EventBridge Scheduler
+  console.log('[EventBridge Scheduler]');
+  const scheduleGroupResult = await checkScheduleGroup(`${env.judgeName}-contest-end`);
+  addResult(scheduleGroupResult);
+  printResult(scheduleGroupResult);
+  console.log('');
+
+  // IAM
+  console.log('[IAM]');
+  const iamRoles = [
+    `${env.judgeName}-codebuild`,
+    `${env.judgeName}-compiler-role`,
+    `${env.judgeName}-contest-end-scheduler-role`,
+    `${env.judgeName}-testdata-upload-role`,
+  ];
+  for (const role of iamRoles) {
+    const result = await checkIAMRole(role);
+    addResult(result);
+    printResult(result);
+  }
+  console.log('');
+
+  // Lambda
+  console.log('[Lambda]');
   const lambdas = [
+    `${env.judgeName}-codebuild-trigger`,
     `${env.judgeName}-compiler`,
+    `${env.judgeName}-contest-end-notifier`,
+    `${env.judgeName}-grader-problem-init`,
+    `${env.judgeName}-grader-problem-scorer`,
+    `${env.judgeName}-problem-validation`,
+    `${env.judgeName}-regrade-problem`,
+    `${env.judgeName}-testcase-grader`,
+    `${env.judgeName}-testcase-grader-wrapper`,
     `${env.judgeName}-websocket-connections`,
     `${env.judgeName}-websocket-invoke`,
   ];
-
   for (const lambda of lambdas) {
     const result = await checkLambdaFunction(lambda);
     addResult(result);
-    const icon = result.success ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
-    console.log(`  ${icon}  ${lambda}`);
+    printResult(result);
+  }
+  console.log('');
+
+  // S3
+  console.log('[S3]');
+  const buckets = [
+    `${env.judgeName}-attachments`,
+    `${env.judgeName}-checkers`,
+    `${env.judgeName}-graders`,
+    `${env.judgeName}-statements`,
+    `${env.judgeName}-submissions`,
+    `${env.judgeName}-testdata`,
+  ];
+  for (const bucket of buckets) {
+    const result = await checkS3Bucket(bucket);
+    addResult(result);
+    printResult(result);
   }
   console.log('');
 
@@ -356,26 +492,11 @@ async function validateAWSSetup(): Promise<void> {
       name: `${env.judgeName}-websocket`,
     },
   ];
-
   for (const sf of stepFunctions) {
     const result = await checkStepFunction(sf.arn, sf.name);
     addResult(result);
-    const icon = result.success ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
-    console.log(`  ${icon}  ${sf.name}`);
+    printResult(result);
   }
-  console.log('');
-
-  // API Gateway WebSocket (this requires the API ID, which might not be easily available)
-  console.log('[API Gateway WebSocket]');
-  // For now, we'll skip this or add it if you have the API ID available
-  const result: ValidationResult = {
-    category: 'API Gateway',
-    name: `${env.judgeName}-websocket`,
-    success: true  // Assuming success for now
-  };
-  addResult(result);
-  const icon = result.success ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
-  console.log(`  ${icon}  ${env.judgeName}-websocket`);
   console.log('');
 
   // Summary
@@ -383,13 +504,14 @@ async function validateAWSSetup(): Promise<void> {
   console.log(`Summary: ${summary.totalFound}/${summary.totalChecked} resources found`);
   console.log('');
 
-  // Category breakdown
-  for (const [category, stats] of Object.entries(summary.categories)) {
+  // Category breakdown (sorted alphabetically)
+  const sortedCategories = Object.entries(summary.categories).sort(([a], [b]) => a.localeCompare(b));
+  for (const [category, stats] of sortedCategories) {
     const progress = createProgressBar(stats.found, stats.checked);
     const statusColor = stats.found === stats.checked ? colors.green : colors.red;
     const statusIcon = stats.found === stats.checked ? '✓' : '✗';
 
-    console.log(`  ${category.padEnd(14)} ${colors.blue}${progress}${colors.reset}  ${stats.found}/${stats.checked}  ${statusColor}${statusIcon}${colors.reset}`);
+    console.log(`  ${category.padEnd(22)} ${colors.blue}${progress}${colors.reset}  ${stats.found}/${stats.checked}  ${statusColor}${statusIcon}${colors.reset}`);
   }
 
   // Exit with error code if any checks failed
