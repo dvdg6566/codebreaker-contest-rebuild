@@ -8,8 +8,5 @@ CLAUDE.md
 /.react-router/
 /build/
 
-# Generated test data
-/testdata/
-
 # AWS SAM build artifacts
 .aws-sam/
