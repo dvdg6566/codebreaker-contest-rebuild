@@ -2,9 +2,11 @@
 CloudFormation Custom Resource Lambda for deploying webapp via App Runner.
 
 This Lambda:
-1. On Create: Triggers CodeBuild, creates App Runner service, initializes sample data
+1. On Create: Triggers CodeBuild, creates App Runner service
 2. On Update: Triggers CodeBuild, updates App Runner service
 3. On Delete: Deletes App Runner service
+
+Data initialization is handled by the app itself on first startup.
 """
 
 import boto3
@@ -14,15 +16,11 @@ import os
 import secrets
 import urllib.request
 
-from init_data import initialize_sample_data
-
 # AWS Clients
 codebuild = boto3.client('codebuild')
 apprunner = boto3.client('apprunner')
-sts = boto3.client('sts')
 
 # Environment variables
-JUDGE_NAME = os.environ.get('JUDGE_NAME', '')
 REGION = os.environ.get('AWS_REGION', 'ap-southeast-1')
 
 
@@ -76,6 +74,22 @@ def create_app_runner_service(judge_name, image_uri, access_role_arn, instance_r
     # Generate session secret
     session_secret = secrets.token_hex(32)
 
+    # Build environment variables
+    env_vars = {
+        'JUDGE_NAME': judge_name,
+        'AWS_REGION': REGION,
+        'COGNITO_USER_POOL_ID': properties['CognitoUserPoolId'],
+        'COGNITO_CLIENT_ID': properties['CognitoClientId'],
+        'API_GATEWAY_LINK': properties['WebSocketEndpoint'],
+        'SESSION_SECRET': session_secret,
+        'NODE_ENV': 'production',
+    }
+
+    # Pass admin email for first-run initialization
+    admin_email = properties.get('AdminEmail')
+    if admin_email:
+        env_vars['ADMIN_EMAIL'] = admin_email
+
     response = apprunner.create_service(
         ServiceName=service_name,
         SourceConfiguration={
@@ -84,15 +98,7 @@ def create_app_runner_service(judge_name, image_uri, access_role_arn, instance_r
                 'ImageRepositoryType': 'ECR',
                 'ImageConfiguration': {
                     'Port': '3000',
-                    'RuntimeEnvironmentVariables': {
-                        'JUDGE_NAME': judge_name,
-                        'AWS_REGION': REGION,
-                        'COGNITO_USER_POOL_ID': properties['CognitoUserPoolId'],
-                        'COGNITO_CLIENT_ID': properties['CognitoClientId'],
-                        'API_GATEWAY_LINK': properties['WebSocketEndpoint'],
-                        'SESSION_SECRET': session_secret,
-                        'NODE_ENV': 'production'
-                    }
+                    'RuntimeEnvironmentVariables': env_vars
                 }
             },
             'AutoDeploymentsEnabled': False,
@@ -195,7 +201,6 @@ def lambda_handler(event, context):
 
     project_name = properties['ProjectName']
     judge_name = properties['JudgeName']
-    admin_email = properties['AdminEmail']
     image_uri = properties['ImageUri']
     access_role_arn = properties['AppRunnerAccessRoleArn']
     instance_role_arn = properties['AppRunnerInstanceRoleArn']
@@ -227,16 +232,6 @@ def lambda_handler(event, context):
         service_arn, service_url = create_app_runner_service(
             judge_name, image_uri, access_role_arn, instance_role_arn, properties
         )
-
-        # Initialize sample data (only on Create)
-        if request_type == 'Create':
-            print('Initializing sample data...')
-            initialize_sample_data(
-                judge_name=judge_name,
-                admin_email=admin_email,
-                user_pool_id=properties['CognitoUserPoolId'],
-                region=REGION
-            )
 
         send_response(event, context, 'SUCCESS', {
             'BuildId': build_id,

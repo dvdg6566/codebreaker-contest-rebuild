@@ -139,19 +139,12 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub ${JudgeName}-webapp-deploy-trigger
-      Description: Custom Resource handler that triggers CodeBuild, creates App Runner, and initializes data
+      Description: Custom Resource handler that triggers CodeBuild and creates App Runner
       CodeUri: ../lambda-functions/webapp-deploy-trigger
       Handler: lambda_function.lambda_handler
-      Runtime: python3.12
+      Runtime: python3.14
       Timeout: 900
-      MemorySize: 512
-      Environment:
-        Variables:
-          JUDGE_NAME: !Ref JudgeName
-          AWS_ACCOUNT_ID: !Ref AWS::AccountId
-          COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
-          COGNITO_CLIENT_ID: !Ref CognitoClientId
-          WEBSOCKET_ENDPOINT: !Ref WebSocketEndpoint
+      MemorySize: 256
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -166,18 +159,6 @@ Resources:
               Resource:
                 - !GetAtt AppRunnerAccessRole.Arn
                 - !GetAtt AppRunnerInstanceRole.Arn
-            - Effect: Allow
-              Action: cognito-idp:*
-              Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}
-            - Effect: Allow
-              Action: dynamodb:*
-              Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JudgeName}-*
-            - Effect: Allow
-              Action: s3:*
-              Resource: !Sub arn:aws:s3:::${JudgeName}-*/*
-            - Effect: Allow
-              Action: lambda:InvokeFunction
-              Resource: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${JudgeName}-compiler
 
   # Custom Resource that triggers deployment
   WebAppTrigger:

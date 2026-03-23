@@ -15,6 +15,10 @@ import { ContestProvider } from "~/contexts/contest-context";
 import type { Contest } from "~/types/database";
 
 export async function loader({ request }: Route.LoaderArgs) {
+  // Run initialization on first request (no-op if already done)
+  const { ensureInitialized } = await import("~/lib/init.server");
+  await ensureInitialized();
+
   const { getCurrentUser } = await import("~/lib/auth.server");
   const session = await getCurrentUser(request);
 

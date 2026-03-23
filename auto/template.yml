@@ -7,6 +7,9 @@ Parameters:
     Description: "Insert name of Codebreaker Clone"
     Type: String
     Default: "codebreakercontest"
+  AdminEmail:
+    Description: "Email address for admin account (will receive temp password)"
+    Type: String
 
 Resources:
   # Storage Stack - S3 Buckets
@@ -78,7 +81,28 @@ Resources:
         GraderProblemScorerFunctionArn: !GetAtt LambdasStack.Outputs.GraderProblemScorerFunctionArn
         WebSocketInvokeFunctionArn: !GetAtt WebSocketStack.Outputs.WebSocketInvokeFunctionArn
 
+  # App Runner Stack - Web Application Hosting
+  AppRunnerStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - CognitoStack
+      - WebSocketStack
+      - CodeBuildStack
+      - StorageStack
+      - DatabaseStack
+    Properties:
+      TemplateURL: templates/apprunner.yml
+      Parameters:
+        JudgeName: !Ref JudgeName
+        AdminEmail: !Ref AdminEmail
+        CognitoUserPoolId: !GetAtt CognitoStack.Outputs.UserPoolId
+        CognitoClientId: !GetAtt CognitoStack.Outputs.UserPoolClientId
+        WebSocketEndpoint: !GetAtt WebSocketStack.Outputs.GatewayEndpoint
+
 Outputs:
+  WebAppUrl:
+    Description: URL of the deployed web application
+    Value: !GetAtt AppRunnerStack.Outputs.AppRunnerServiceUrl
   GatewayEndpoint:
     Description: WebSocket API Gateway endpoint
     Value: !GetAtt WebSocketStack.Outputs.GatewayEndpoint
