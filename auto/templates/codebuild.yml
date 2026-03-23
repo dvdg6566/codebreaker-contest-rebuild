@@ -11,6 +11,7 @@ Resources:
     Type: AWS::ECR::Repository
     Properties:
       RepositoryName: !Sub ${JudgeName}-compiler-repository
+      EmptyOnDelete: true
       RepositoryPolicyText:
         Version: '2012-10-17'
         Statement:
