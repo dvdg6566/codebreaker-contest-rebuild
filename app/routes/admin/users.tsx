@@ -24,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { listUsers, createUser, deleteUser } from "~/lib/db/users.server";
 import type { UserRole } from "~/types/database";
 
 export function meta({}: Route.MetaArgs) {
@@ -35,6 +34,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({}: Route.LoaderArgs) {
+  const { listUsers } = await import("~/lib/db/users.server");
   const users = await listUsers();
 
   // Map database users to UI format
@@ -49,6 +49,7 @@ export async function loader({}: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  const { createUser, deleteUser } = await import("~/lib/db/users.server");
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
 

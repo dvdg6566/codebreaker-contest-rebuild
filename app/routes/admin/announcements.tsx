@@ -57,14 +57,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import {
-  listAnnouncements,
-  createAnnouncement,
-  updateAnnouncement,
-  deleteAnnouncement,
-} from "~/lib/db/announcements.server";
-import { announce } from "~/lib/websocket-broadcast.server";
-
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Manage Announcements - Admin" },

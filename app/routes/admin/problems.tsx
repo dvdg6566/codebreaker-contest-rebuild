@@ -2,7 +2,6 @@ import { data, redirect, Form } from "react-router";
 import type { Route } from "./+types/problems";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { ProblemManagementTable } from "~/components/admin/problem-management-table";
-import { listProblems, createProblem } from "~/lib/db/problems.server";
 import type { ProblemListItem } from "~/types/problem";
 
 export function meta({}: Route.MetaArgs) {
@@ -13,6 +12,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({}: Route.LoaderArgs) {
+  const { listProblems } = await import("~/lib/db/problems.server");
   const problems = await listProblems();
 
   // Map database problems to display format
@@ -35,6 +35,7 @@ export async function loader({}: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  const { createProblem } = await import("~/lib/db/problems.server");
   const formData = await request.formData();
   const problemId = formData.get("problemId") as string;
 
