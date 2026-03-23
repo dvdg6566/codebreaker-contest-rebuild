@@ -72,7 +72,7 @@ Resources:
             Value: !Sub ${JudgeName}-webapp-repository
       Source:
         Type: GITHUB
-        Location: https://github.com/dvdg6566/codebreaker-contest-manager
+        Location: https://github.com/dvdg6566/codebreaker-contest-rebuild
         BuildSpec: buildspec-webapp.yml
       TimeoutInMinutes: 30
 
