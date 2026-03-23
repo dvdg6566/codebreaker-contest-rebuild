@@ -286,7 +286,7 @@ export default function ProblemDetail({ loaderData, actionData }: Route.Componen
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/problems">
+            <Link to="/admin/problems">
               <ChevronLeft className="h-4 w-4 mr-1" />
               Back
             </Link>
