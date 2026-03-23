@@ -42,14 +42,6 @@ import {
 } from "~/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ClientOnly } from "~/components/ui/client-only";
-import {
-  listClarifications,
-  answerClarification,
-  getClarification,
-} from "~/lib/db/clarifications.server";
-import { getUser } from "~/lib/db/users.server";
-import { getProblem } from "~/lib/db/problems.server";
-import { answerClarification as broadcastAnswerClarification } from "~/lib/websocket-broadcast.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -62,6 +54,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { requireAdmin } = await import("~/lib/auth.server");
   const { listClarifications } = await import("~/lib/db/clarifications.server");
   const { listContests } = await import("~/lib/db/contests.server");
+  const { getUser } = await import("~/lib/db/users.server");
+  const { getProblem } = await import("~/lib/db/problems.server");
 
   await requireAdmin(request);
 
@@ -98,6 +92,9 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  const { getClarification, answerClarification } = await import("~/lib/db/clarifications.server");
+  const { answerClarification: broadcastAnswerClarification } = await import("~/lib/websocket-broadcast.server");
+
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
 
