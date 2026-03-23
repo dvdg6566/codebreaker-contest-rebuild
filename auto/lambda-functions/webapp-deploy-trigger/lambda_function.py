@@ -48,8 +48,8 @@ def send_response(event, context, status, data=None, reason=None):
     urllib.request.urlopen(req)
 
 
-def wait_for_build(build_id, max_attempts=180):
-    """Poll CodeBuild until build completes. Max ~30 minutes."""
+def wait_for_build(build_id, max_attempts=40):
+    """Poll CodeBuild until build completes. Max ~7 minutes (40 * 10s)."""
     for attempt in range(max_attempts):
         time.sleep(10)
 
@@ -158,8 +158,8 @@ def get_or_create_autoscaling_config(judge_name):
     return response['AutoScalingConfiguration']['AutoScalingConfigurationArn']
 
 
-def wait_for_service_running(service_arn, max_attempts=60):
-    """Wait for App Runner service to be running."""
+def wait_for_service_running(service_arn, max_attempts=48):
+    """Wait for App Runner service to be running. Max ~8 minutes (48 * 10s)."""
     for attempt in range(max_attempts):
         time.sleep(10)
 

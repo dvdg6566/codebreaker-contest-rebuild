@@ -40,8 +40,8 @@ def send_response(event, context, status, data=None, reason=None):
     urllib.request.urlopen(req)
 
 
-def wait_for_build(build_id, max_attempts=120):
-    """Poll CodeBuild until build completes. Max ~20 minutes."""
+def wait_for_build(build_id, max_attempts=80):
+    """Poll CodeBuild until build completes. Max ~13 minutes (80 * 10s)."""
     for _ in range(max_attempts):
         time.sleep(10)
 
