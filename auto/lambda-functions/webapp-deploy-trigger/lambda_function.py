@@ -133,7 +133,8 @@ def create_app_runner_service(judge_name, image_uri, access_role_arn, instance_r
 
 def get_or_create_autoscaling_config(judge_name):
     """Get or create auto-scaling configuration."""
-    config_name = f'{judge_name}-webapp-autoscaling'
+    # Name must be <= 32 chars, use short suffix
+    config_name = f'{judge_name}-webapp-as'
 
     # Try to find existing config
     try:
