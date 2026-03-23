@@ -55,11 +55,19 @@ https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate
   ?templateURL=https://codebreaker-templates-<your-unique-suffix>.s3.amazonaws.com/packaged.yml
   &stackName=codebreaker
   &param_JudgeName=mycontest
+  &param_AdminEmail=admin@example.com
 ```
+
+### Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `JudgeName` | Unique identifier for this deployment (used in resource names) |
+| `AdminEmail` | Email address for admin account (receives temporary password via Cognito) |
 
 URL-encoded version:
 ```
-https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?templateURL=https%3A%2F%2Fcodebreaker-templates-<your-unique-suffix>.s3.amazonaws.com%2Fpackaged.yml&stackName=codebreaker&param_JudgeName=mycontest
+https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?templateURL=https%3A%2F%2Fcodebreaker-templates-<your-unique-suffix>.s3.amazonaws.com%2Fpackaged.yml&stackName=codebreaker&param_JudgeName=mycontest&param_AdminEmail=admin%40example.com
 ```
 
 ## Updating One-Click Deployment
