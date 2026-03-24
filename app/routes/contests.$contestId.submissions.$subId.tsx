@@ -1,6 +1,7 @@
-import type { Route } from "./+types/submissions.$subId";
+import type { Route } from "./+types/contests.$contestId.submissions.$subId";
 import { Link, useRevalidator } from "react-router";
 import { useEffect } from "react";
+import { useContestWebSocket } from "~/hooks/useContestWebSocket";
 import {
   ChevronLeft,
   Clock,
@@ -12,20 +13,17 @@ import {
   Timer,
   Copy,
   Download,
-  User,
   Calendar,
 } from "lucide-react";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { ScoreBadge, type VerdictType } from "~/components/ui/score-badge";
-import { UserAvatar } from "~/components/ui/user-avatar";
 import { Separator } from "~/components/ui/separator";
 import {
   Collapsible,
@@ -42,14 +40,17 @@ export function meta({ params }: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  const { requireAdmin } = await import("~/lib/auth.server");
+  const { requireContestAccess } = await import("~/lib/auth.server");
   const { getSubmission, getSubmissionVerdict } = await import("~/lib/db/submissions.server");
   const { getProblem } = await import("~/lib/db/problems.server");
-  const { getUser } = await import("~/lib/db/users.server");
   const { getSubmissionSource, getCommunicationSource } = await import("~/lib/s3.server");
 
-  // Admin-only route - users view their submissions via /contests/:contestId/submissions/:subId
-  await requireAdmin(request);
+  const { contestId } = params;
+  if (!contestId) {
+    throw new Response("Contest ID required", { status: 400 });
+  }
+
+  const session = await requireContestAccess(request, contestId);
 
   const subId = parseInt(params.subId, 10);
   if (isNaN(subId)) {
@@ -61,10 +62,17 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Submission not found", { status: 404 });
   }
 
-  const [problem, user] = await Promise.all([
-    getProblem(submission.problemName),
-    getUser(submission.username),
-  ]);
+  // Users can only view their own submissions
+  if (submission.username !== session.username) {
+    throw new Response("You don't have permission to view this submission", { status: 403 });
+  }
+
+  // Verify submission belongs to this contest
+  if (submission.contestId !== contestId) {
+    throw new Response("Submission not found in this contest", { status: 404 });
+  }
+
+  const problem = await getProblem(submission.problemName);
 
   // Get source code from S3
   let code: string | null = null;
@@ -148,12 +156,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       : submission.language;
 
   return {
-    isAdmin: true, // This route is admin-only
+    contestId,
     submissionData: {
       id: submission.subId,
-      username: submission.username,
-      displayName: user?.fullname || submission.username,
-      contestId: submission.contestId,
       problem: problem?.title || submission.problemName,
       problemId: submission.problemName,
       problemType: problem?.problem_type || "Batch",
@@ -196,9 +201,12 @@ const verdictIcon = (verdict: string) => {
   }
 };
 
-export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
-  const { submissionData, isAdmin } = loaderData;
+export default function ContestSubmissionDetail({ loaderData }: Route.ComponentProps) {
+  const { contestId, submissionData } = loaderData;
   const revalidator = useRevalidator();
+
+  // Register with WebSocket for contest notifications
+  useContestWebSocket(contestId);
 
   useEffect(() => {
     if (!submissionData.isGrading) return;
@@ -212,7 +220,7 @@ export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link to={isAdmin ? "/admin/submissions" : `/contests/${submissionData.contestId}/submissions`}>
+            <Link to={`/contests/${contestId}/submissions`}>
               <ChevronLeft className="h-4 w-4 mr-1" />
               Back
             </Link>
@@ -229,7 +237,7 @@ export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
             </div>
             <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
               <Link
-                to={`/admin/problem/${submissionData.problemId}`}
+                to={`/contests/${contestId}/problem/${submissionData.problemId}`}
                 className="hover:underline"
               >
                 {submissionData.problem}
@@ -238,8 +246,6 @@ export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
               <span>{submissionData.language}</span>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
         </div>
       </div>
 
@@ -390,25 +396,6 @@ export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <div className="flex-1">
-                  <p className="text-xs text-muted-foreground">Submitted by</p>
-                  <Link
-                    to={`/profile/${submissionData.username}`}
-                    className="flex items-center gap-2 hover:underline"
-                  >
-                    <UserAvatar
-                      name={submissionData.displayName}
-                      size="sm"
-                    />
-                    <span className="text-sm font-medium">
-                      {submissionData.displayName}
-                    </span>
-                  </Link>
-                </div>
-              </div>
-              <Separator />
-              <div className="flex items-center gap-3">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">Submitted at</p>
@@ -457,17 +444,15 @@ export default function SubmissionDetail({ loaderData }: Route.ComponentProps) {
             </CardHeader>
             <CardContent className="space-y-2">
               <Button variant="outline" className="w-full justify-start" asChild>
-                <Link to={`/admin/problem/${submissionData.problemId}`}>
+                <Link to={`/contests/${contestId}/problem/${submissionData.problemId}`}>
                   <Code2 className="h-4 w-4 mr-2" />
                   View Problem
                 </Link>
               </Button>
               <Button variant="outline" className="w-full justify-start" asChild>
-                <Link
-                  to={`/submissions?username=${submissionData.username}&problem=${submissionData.problemId}`}
-                >
+                <Link to={`/contests/${contestId}/submissions`}>
                   <Clock className="h-4 w-4 mr-2" />
-                  All Submissions
+                  All My Submissions
                 </Link>
               </Button>
             </CardContent>

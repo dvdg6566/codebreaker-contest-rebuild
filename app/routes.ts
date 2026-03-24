@@ -54,6 +54,7 @@ export default [
       route("problems", "routes/contests.$contestId.problems.tsx"),
       route("problem/:problemId", "routes/contests.$contestId.problem.$problemId.tsx"),
       route("submissions", "routes/contests.$contestId.submissions.tsx"),
+      route("submissions/:subId", "routes/contests.$contestId.submissions.$subId.tsx"),
       route("scoreboard", "routes/contests.$contestId.scoreboard.tsx"),
       route("announcements", "routes/contests.$contestId.announcements.tsx"),
       route("clarifications", "routes/contests.$contestId.clarifications.tsx"),

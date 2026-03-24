@@ -325,7 +325,7 @@ export default function ContestSubmissions({ loaderData }: Route.ComponentProps)
                         </TableCell>
                         <TableCell>
                           <Button asChild size="sm" variant="ghost">
-                            <Link to={`/submissions/${submission.subId}`}>
+                            <Link to={`/contests/${contest.contestId}/submissions/${submission.subId}`}>
                               <Eye className="h-4 w-4" />
                             </Link>
                           </Button>
