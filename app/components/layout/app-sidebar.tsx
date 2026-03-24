@@ -399,58 +399,13 @@ function ContestSection({
             </>
           )}
 
-          {/* Show global navigation when no contest is selected */}
+          {/* Show message when no contest is selected */}
           {!currentContest && (
-            <>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/admin/submissions")}
-                  tooltip="All Submissions"
-                >
-                  <Link to="/admin/submissions">
-                    <Send />
-                    <span>All Submissions</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/announcements")}
-                  tooltip="Announcements"
-                >
-                  <Link to="/announcements">
-                    <Megaphone />
-                    <span>Announcements</span>
-                    {unreadAnnouncementsCount > 0 && (
-                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
-                        {unreadAnnouncementsCount > 9 ? "9+" : unreadAnnouncementsCount}
-                      </span>
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/clarifications")}
-                  tooltip="Clarifications"
-                >
-                  <Link to="/clarifications">
-                    <MessageSquare />
-                    <span>Clarifications</span>
-                    {unreadClarificationsCount > 0 && (
-                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
-                        {unreadClarificationsCount > 9 ? "9+" : unreadClarificationsCount}
-                      </span>
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </>
+            <SidebarMenuItem>
+              <div className="px-2 py-3 text-sm text-muted-foreground">
+                Select a contest to view problems, submissions, and more.
+              </div>
+            </SidebarMenuItem>
           )}
         </SidebarMenu>
       </SidebarGroupContent>
