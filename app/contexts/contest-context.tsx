@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { ReactNode } from "react";
 import type { Contest } from "~/types/database";
+import { useWebSocketContext } from "~/context/websocket-context";
 
 interface ContestContextType {
   currentContest: Contest | null;
@@ -44,6 +45,8 @@ export function ContestProvider({
       if (lastViewed) {
         const contest = initialContests.find(c => c.contestId === lastViewed);
         if (contest) return contest;
+        // Clear stale localStorage entry if contest no longer exists
+        localStorage.removeItem("lastViewedContest");
       }
     }
 
@@ -112,6 +115,32 @@ export function ContestProvider({
       saveLastViewedContest(currentContest.contestId);
     }
   }, [currentContest?.contestId]);
+
+  // Handle contest end from WebSocket notification
+  const { onContestEnd } = useWebSocketContext();
+
+  const handleContestEnd = useCallback((endedContestId: string) => {
+    // Remove ended contest from available contests
+    setAvailableContests(prev => {
+      const updated = prev.filter(c => c.contestId !== endedContestId);
+      return updated;
+    });
+
+    // Clear localStorage if the ended contest was the last viewed
+    if (typeof window !== "undefined") {
+      const lastViewed = localStorage.getItem("lastViewedContest");
+      if (lastViewed === endedContestId) {
+        localStorage.removeItem("lastViewedContest");
+      }
+    }
+
+    // If current contest ended, the useEffect above will handle switching
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onContestEnd(handleContestEnd);
+    return unsubscribe;
+  }, [onContestEnd, handleContestEnd]);
 
   const contextValue: ContestContextType = {
     currentContest,
