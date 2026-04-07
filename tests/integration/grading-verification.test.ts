@@ -179,10 +179,10 @@ describe('Grading Verification', () => {
     }, 180000) // 3 minute test timeout for grading
 
     it('verifies prisoners brute force solution gets expected subtask scores [25, 25, 25, 25]', async () => {
-      console.log('🔬 Testing prisoners brute force solution with expected score 100.0...')
+      console.log('🔬 Testing prisoners brute force solution with expected score 25.0...')
 
       // Get the brute force sample submission metadata
-      const submission = getSampleSubmission('prisoners', 100.0)
+      const submission = getSampleSubmission('prisoners', 25.0)
       expect(submission.expectedSubtasks).toEqual([25, 25, 25, 25])
       expect(submission.expectedVerdict).toBe('WA')
 
@@ -222,6 +222,54 @@ describe('Grading Verification', () => {
       expect(verdict).toBe('WA')
 
       console.log(`✅ Brute force solution verification successful:`)
+      console.log(`   Expected: [${submission.expectedSubtasks?.join(', ')}] = ${submission.expectedScore} (${submission.expectedVerdict})`)
+      console.log(`   Actual:   [${gradedSubmission.subtaskScores.join(', ')}] = ${gradedSubmission.totalScore} (${verdict})`)
+    }, 180000) // 3 minute test timeout for grading
+
+    it('verifies prisoners cycle solution gets expected subtask scores [100, 100, 0, 100]', async () => {
+      console.log('🔬 Testing prisoners cycle solution with expected score 56.0...')
+
+      // Get the cycle sample submission metadata
+      const submission = getSampleSubmission('prisoners', 56.0)
+      expect(submission.expectedSubtasks).toEqual([100, 100, 0, 100])
+      expect(submission.expectedVerdict).toBe('RTE')
+
+      // Read solution files
+      const swapperCode = readSubmissionFile(submission, 'secondary')
+      const prisonerCode = readSubmissionFile(submission, 'main')
+
+      expect(swapperCode).toContain('#include "swapper.h"')
+      expect(prisonerCode).toContain('#include "prisoner.h"')
+      console.log('✅ Cycle solution files loaded successfully')
+
+      // Submit communication solution
+      const result = await submitCommunicationSolution(
+        TEST_USER,
+        TEST_CONTEST_ID,
+        'prisoners',
+        {
+          swapper: swapperCode,
+          prisoner: prisonerCode
+        }
+      )
+
+      console.log(`✅ Cycle submission created with ID: ${result.subId}`)
+
+      // Wait for grading to complete
+      console.log('⏳ Waiting for cycle solution grading to complete...')
+      const gradedSubmission = await waitForGradingComplete(result.subId, 120000)
+
+      console.log(`✅ Cycle solution grading completed at: ${gradedSubmission.gradingCompleteTime}`)
+
+      // Core verification: scores match expected metadata exactly
+      expect(gradedSubmission.totalScore).toBeCloseTo(submission.expectedScore, 2)
+      expect(gradedSubmission.subtaskScores).toEqual(submission.expectedSubtasks)
+
+      // Verify verdict
+      const verdict = getSubmissionVerdict(gradedSubmission)
+      expect(verdict).toBe('RTE')
+
+      console.log(`✅ Cycle solution verification successful:`)
       console.log(`   Expected: [${submission.expectedSubtasks?.join(', ')}] = ${submission.expectedScore} (${submission.expectedVerdict})`)
       console.log(`   Actual:   [${gradedSubmission.subtaskScores.join(', ')}] = ${gradedSubmission.totalScore} (${verdict})`)
     }, 180000) // 3 minute test timeout for grading

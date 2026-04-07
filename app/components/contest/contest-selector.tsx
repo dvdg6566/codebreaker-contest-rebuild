@@ -60,9 +60,6 @@ export function ContestSelector({
     return (
       <div className="px-3 py-2 text-center">
         <p className="text-sm text-muted-foreground">No active contests</p>
-        <Button variant="link" size="sm" onClick={() => navigate("/contests")}>
-          Browse Contests
-        </Button>
       </div>
     );
   }
