@@ -110,6 +110,8 @@ export interface Contest {
   public?: boolean;
   /** Whether scoreboard is publicly visible */
   publicScoreboard?: boolean;
+  /** Scoreboard visibility setting */
+  scoreboardVisibility?: "hidden" | "public" | "participants";
   /** Contest creation timestamp */
   createdAt?: string;
 }

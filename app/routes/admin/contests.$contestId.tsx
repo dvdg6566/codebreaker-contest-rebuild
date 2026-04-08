@@ -21,6 +21,7 @@ import {
   Settings,
   Eye,
   EyeOff,
+  BarChart3,
 } from "lucide-react";
 import {
   Card,
@@ -194,7 +195,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const subLimit = parseInt(formData.get("subLimit") as string);
     const subDelay = parseInt(formData.get("subDelay") as string);
     const isPublic = formData.get("public") === "on";
-    const publicScoreboard = formData.get("publicScoreboard") === "on";
+    const scoreboardVisibility = formData.get("scoreboardVisibility") as string;
 
     if (subDelay < 5) {
       return { error: "Submission delay must be at least 5 seconds" };
@@ -204,11 +205,16 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { error: "Submission limit must be -1 (unlimited) or a positive number" };
     }
 
+    // Validate scoreboard visibility
+    if (!["hidden", "public", "participants"].includes(scoreboardVisibility)) {
+      return { error: "Invalid scoreboard visibility setting" };
+    }
+
     await updateContest(contestId, {
       subLimit,
       subDelay,
       public: isPublic,
-      publicScoreboard,
+      scoreboardVisibility: scoreboardVisibility as "hidden" | "public" | "participants",
     });
     return { success: true, message: "Settings updated" };
   }
@@ -352,6 +358,12 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`/contests/${contest.contestId}/scoreboard`}>
+              <BarChart3 className="mr-2 h-4 w-4" />
+              View Scoreboard
+            </Link>
+          </Button>
           <Badge
             variant={
               status === "ONGOING"
@@ -601,17 +613,24 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
                       />
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Public Scoreboard</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Anyone can view the scoreboard
-                        </p>
-                      </div>
-                      <Switch
-                        name="publicScoreboard"
-                        defaultChecked={contest.publicScoreboard}
-                      />
+                    <div className="space-y-2">
+                      <Label>Scoreboard Visibility</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Control who can view the contest scoreboard
+                      </p>
+                      <Select
+                        name="scoreboardVisibility"
+                        defaultValue={contest.scoreboardVisibility || (contest.publicScoreboard ? "public" : "hidden")}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select visibility" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="hidden">Hidden - Admin only</SelectItem>
+                          <SelectItem value="participants">Participants - Contest members only</SelectItem>
+                          <SelectItem value="public">Public - Anyone can view</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 

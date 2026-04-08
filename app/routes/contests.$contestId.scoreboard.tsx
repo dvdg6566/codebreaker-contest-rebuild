@@ -26,39 +26,36 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { canUserAccessContest, getContest } = await import("~/lib/contest.server");
   const { getScoreboard } = await import("~/lib/db/scoreboard.server");
 
-  const session = await requireAuth(request);
+  const user = await requireAuth(request);
   const contest = await getContest(contestId);
 
   if (!contest) {
     throw new Response("Contest not found", { status: 404 });
   }
 
-  // Scoreboard access logic:
-  // 1. User is admin -> yes
-  // 2. Scoreboard not public -> no
-  // 3. User not in contest -> no
-  // 4. yes
+  // Access control based on scoreboard visibility
+  const visibility = contest.scoreboardVisibility || (contest.publicScoreboard ? "public" : "hidden");
+  const isAdmin = user.role === "admin";
 
-  const isAdmin = session.role === "admin";
-  const isPublic = contest.publicScoreboard === true;
-  const userInContest = await canUserAccessContest(session.username, contestId);
-
-  if (isAdmin) {
-    // Admin can always access
-  } else if (!isPublic) {
-    throw new Response("Scoreboard is not public", { status: 403 });
-  } else if (!userInContest) {
-    throw new Response("You are not a participant in this contest", { status: 403 });
+  if (visibility === "hidden" && !isAdmin) {
+    throw new Response("Scoreboard is hidden", { status: 403 });
+  } else if (visibility === "participants" && !isAdmin) {
+    const userInContest = await canUserAccessContest(user.username, contestId);
+    if (!userInContest) {
+      throw new Response("You are not a participant in this contest", { status: 403 });
+    }
   }
-  // Otherwise allow access
+  // Public visibility allows any authenticated user
 
   // Get scoreboard data
   const scoreboard = await getScoreboard(contestId);
 
   return {
     contest,
-    user: session,
+    user,
     scoreboard,
+    visibility,
+    isAdmin,
   };
 }
 
