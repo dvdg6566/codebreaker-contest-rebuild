@@ -10,3 +10,9 @@ CLAUDE.md
 
 # AWS SAM build artifacts
 .aws-sam/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
