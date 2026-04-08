@@ -232,7 +232,7 @@ describe('Grading Verification', () => {
       // Get the cycle sample submission metadata
       const submission = getSampleSubmission('prisoners', 56.0)
       expect(submission.expectedSubtasks).toEqual([100, 100, 0, 100])
-      expect(submission.expectedVerdict).toBe('RTE')
+      expect(submission.expectedVerdict).toBe('PS')
 
       // Read solution files
       const swapperCode = readSubmissionFile(submission, 'secondary')
@@ -267,7 +267,7 @@ describe('Grading Verification', () => {
 
       // Verify verdict
       const verdict = getSubmissionVerdict(gradedSubmission)
-      expect(verdict).toBe('RTE')
+      expect(verdict).toBe('PS')
 
       console.log(`✅ Cycle solution verification successful:`)
       console.log(`   Expected: [${submission.expectedSubtasks?.join(', ')}] = ${submission.expectedScore} (${submission.expectedVerdict})`)

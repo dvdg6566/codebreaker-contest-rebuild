@@ -32,6 +32,7 @@ export async function startGrading(params: {
   username: string;
   language: string;
   problemType: string;
+  contestId?: string;
   submissionTime?: string;
 }): Promise<void> {
   const {
@@ -40,6 +41,7 @@ export async function startGrading(params: {
     username,
     language,
     problemType,
+    contestId,
     submissionTime,
   } = params;
 
@@ -50,6 +52,7 @@ export async function startGrading(params: {
     problemName,
     submissionId,
     username,
+    contestId,
     submissionTime:
       submissionTime || new Date().toISOString().replace("T", " ").slice(0, 19),
     language,
@@ -86,6 +89,7 @@ export async function regradeSubmission(subId: number): Promise<boolean> {
     username: submission.username,
     language: submission.language,
     problemType: problem.problem_type,
+    contestId: submission.contestId,
     submissionTime: submission.submissionTime,
   });
 

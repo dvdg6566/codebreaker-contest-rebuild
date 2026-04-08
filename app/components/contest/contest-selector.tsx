@@ -58,8 +58,17 @@ export function ContestSelector({
 
   if (availableContests.length === 0) {
     return (
-      <div className="px-3 py-2 text-center">
-        <p className="text-sm text-muted-foreground">No active contests</p>
+      <div className="px-3 py-2 space-y-2">
+        <p className="text-sm text-muted-foreground text-center">No active contests</p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full h-8 text-xs"
+          onClick={() => navigate("/contests")}
+        >
+          <Trophy className="w-3 h-3 mr-1" />
+          Browse All Contests
+        </Button>
       </div>
     );
   }

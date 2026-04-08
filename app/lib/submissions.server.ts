@@ -81,6 +81,7 @@ export async function submitSolution(params: SubmitSolutionParams): Promise<Subm
       username,
       language,
       problemType: problem.problem_type,
+      contestId: submission.contestId,
     });
 
     return submission;
@@ -112,6 +113,7 @@ export async function submitSolution(params: SubmitSolutionParams): Promise<Subm
     username,
     language,
     problemType: problem.problem_type,
+    contestId: submission.contestId,
   });
 
   return submission;

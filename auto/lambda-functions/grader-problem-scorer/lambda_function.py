@@ -94,19 +94,44 @@ def lambda_handler(event, context):
 	# Update user table if score is updated
 	userInfo = awstools.getProblemScores(username)
 	problemScore = 0
-	if problemName in userInfo['problemScores']:
+	if userInfo and 'problemScores' in userInfo and problemName in userInfo['problemScores']:
 		problemScore = userInfo['problemScores'][problemName]
 
 	if stitchedScore > problemScore:
 		# Update latest score change
 		awstools.updateUserScore(
-			username = username, 
-			problemName = problemName, 
+			username = username,
+			problemName = problemName,
 			stitchedScore = stitchedScore,
 			latestScoreChange = submissionTime
 		)
-	
+
 	''' END: STITCHING FOR USER'S MAXIMUM SCORE  '''
+
+	''' BEGIN: UPDATE CONTEST SCORES '''
+	# Get contestId from Step Function input
+	contest_id = event.get('contestId')
+	print(f"Processing submission for contest: {contest_id}")
+
+	# Only update scores for the specific contest this submission belongs to
+	if contest_id and contest_id != 'global':
+		try:
+			# Update contest-level subtask scores and derive user total score
+			# This function now handles both contest table and user table updates
+			awstools.updateContestScore(
+				contestId=contest_id,
+				username=username,
+				problemName=problemName,
+				subtaskScores=subtaskScores
+			)
+			print(f"Updated contest scores for {username} in {contest_id}")
+		except Exception as e:
+			print(f"Error updating contest scores for {contest_id}: {e}")
+	else:
+		print(f"Skipping contest score update - submission is global or no contestId provided")
+
+	''' END: UPDATE CONTEST SCORES '''
+
 	return {
 		"statusCode":200
 	}

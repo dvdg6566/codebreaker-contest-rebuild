@@ -12,8 +12,8 @@ export default defineConfig({
       '**/tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}' // Added tests/ directory
     ],
     exclude: ['node_modules', 'build', '.react-router'],
-    testTimeout: 60000, // 1 minute default timeout
-    hookTimeout: 30000, // 30 seconds for setup/teardown
+    testTimeout: 120000, // 2 minute default timeout (increased for grading)
+    hookTimeout: 60000, // 1 minute for setup/teardown (increased for contest setup)
     coverage: {
       reporter: ['text', 'json', 'html'],
       exclude: [

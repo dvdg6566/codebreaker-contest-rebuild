@@ -182,6 +182,15 @@ export async function action({ request, params }: Route.ActionArgs) {
       const subtaskScores = subtasks.map((st) => st.score);
       const subtaskDependency = subtasks.map((st) => st.dependency);
 
+      // Validate that subtask scores sum to 100
+      const totalScore = subtaskScores.reduce((sum, score) => sum + score, 0);
+      if (totalScore !== 100) {
+        return {
+          success: false,
+          message: `Subtask scores must sum to 100, but got ${totalScore}. Please adjust the scores before saving.`
+        };
+      }
+
       // Also update testcaseCount based on the max testcase referenced in dependencies
       let maxTestcase = 0;
       for (const dep of subtaskDependency) {
@@ -1012,10 +1021,19 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
               )}
             </div>
 
-            <Button variant="secondary" onClick={handleUpdateSubtasks} disabled={isLoading}>
+            <Button
+              variant="secondary"
+              onClick={handleUpdateSubtasks}
+              disabled={isLoading || totalScore !== 100}
+            >
               <Save className="mr-2 h-4 w-4" />
               Update Subtasks
             </Button>
+            {totalScore !== 100 && (
+              <p className="text-sm text-muted-foreground">
+                Subtasks must total 100 points to save
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

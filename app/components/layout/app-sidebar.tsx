@@ -349,20 +349,6 @@ function ContestSection({
         <ContestSelector variant="sidebar" showTimeRemaining />
 
         <SidebarMenu>
-          {/* My Contests Link */}
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={isActive("/contests")}
-              tooltip="My Contests"
-            >
-              <Link to="/contests">
-                <Trophy />
-                <span>My Contests</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
           {/* Contest-specific navigation (show when contest is selected) */}
           {currentContest && (
             <>
@@ -399,14 +385,6 @@ function ContestSection({
             </>
           )}
 
-          {/* Show message when no contest is selected */}
-          {!currentContest && (
-            <SidebarMenuItem>
-              <div className="px-2 py-3 text-sm text-muted-foreground">
-                Select a contest to view problems, submissions, and more.
-              </div>
-            </SidebarMenuItem>
-          )}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
