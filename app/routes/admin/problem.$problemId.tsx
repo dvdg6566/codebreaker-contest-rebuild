@@ -220,7 +220,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       code: problem.problem_type === "Communication" ? undefined : code,
       codeA: problem.problem_type === "Communication" ? codeA : undefined,
       codeB: problem.problem_type === "Communication" ? codeB : undefined,
-      // No contestId = global admin submission
+      contestId: "global", // Admin submissions are global
     });
 
     return {

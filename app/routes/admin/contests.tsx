@@ -175,7 +175,7 @@ export default function AdminContestsPage({ loaderData, actionData }: Route.Comp
   // Stats
   const ongoingCount = contests.filter((c) => c.status === "ONGOING").length;
   const upcomingCount = contests.filter((c) => c.status === "NOT_STARTED").length;
-  const totalParticipants = contests.reduce((sum, c) => sum + c.userCount, 0);
+  const completedCount = contests.filter((c) => c.status === "ENDED").length;
 
   return (
     <div className="space-y-6">
@@ -281,12 +281,12 @@ export default function AdminContestsPage({ loaderData, actionData }: Route.Comp
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100">
-                <Users className="h-5 w-5 text-violet-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
+                <CheckCircle className="h-5 w-5 text-gray-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Participants</p>
-                <p className="text-2xl font-bold">{totalParticipants}</p>
+                <p className="text-sm text-muted-foreground">Completed</p>
+                <p className="text-2xl font-bold">{completedCount}</p>
               </div>
             </div>
           </CardContent>

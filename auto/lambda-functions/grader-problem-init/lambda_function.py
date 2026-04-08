@@ -9,7 +9,7 @@ def lambda_handler(event, context):
     subTime = event['submissionTime']
     language = event['language'] # Language should be from "py" or "cpp"
     contestId = event.get('contestId')  # Extract contestId for contest scoring
-    
+
     problemInfo = awstools.getProblemInfo(problemName)
 
     timeLimit = problemInfo['timeLimit']
@@ -47,9 +47,10 @@ def lambda_handler(event, context):
         "subtaskScores":subtaskScores,
         "status":status,
         "totalScore":0,
-        "language": language
+        "language": language,
+        "contestId": contestId  # Include contestId field
     }
-    
+
     awstools.uploadSubmission(submission_upload)
     
     # GENERATES LAMBDA INPUT TO SEND TO STATE MACHINE
@@ -64,7 +65,7 @@ def lambda_handler(event, context):
     for i in range(1, testcaseNumber + 1):
         output['payloads'].append({
             'problemName': problemName,
-            'submissionId': submissionId, 
+            'submissionId': submissionId,
             'testcaseNumber': i,
             'memoryLimit': float(memoryLimit),
             'timeLimit': float(timeLimit),

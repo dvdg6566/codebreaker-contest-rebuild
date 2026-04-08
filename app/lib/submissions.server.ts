@@ -35,8 +35,9 @@ export async function submitSolution(params: SubmitSolutionParams): Promise<Subm
     throw new Error("Problem is not available for submissions");
   }
 
-  // If contestId provided, validate contest access and status
-  if (contestId) {
+  // If contestId provided, validate access
+  if (contestId && contestId !== "global") {
+    // Regular contest submission - validate contest access
     const contestStatus = await isUserInActiveContest(username, contestId);
     if (!contestStatus.active) {
       throw new Error("Contest is not active or you don't have access");
@@ -44,6 +45,13 @@ export async function submitSolution(params: SubmitSolutionParams): Promise<Subm
 
     if (!contestStatus.contest?.problems.includes(problemName)) {
       throw new Error("Problem is not part of this contest");
+    }
+  } else if (contestId === "global") {
+    // Global submission - validate admin access
+    const { getUser } = await import("./db/users.server");
+    const user = await getUser(username);
+    if (!user || user.accountRole !== "admin") {
+      throw new Error("Global submissions are only allowed for admin users");
     }
   }
 

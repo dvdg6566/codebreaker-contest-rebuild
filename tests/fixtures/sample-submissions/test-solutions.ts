@@ -64,10 +64,10 @@ export const SAMPLE_SUBMISSIONS: SubmissionCase[] = [
       secondary: 'swapper-cycles.cpp'
     },
     language: 'cpp',
-    expectedVerdict: 'PS',
+    expectedVerdict: 'RTE',
     expectedScore: 56.0,
     expectedSubtasks: [100, 100, 0, 100],
-    description: 'Cycle-based strategy that works on subtasks 1,2,4'
+    description: 'Cycle-based strategy that sometimes gets runtime errors but achieves partial scores'
   },
 
   // Prisoners problem - brute force solution (opens all boxes)

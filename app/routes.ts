@@ -68,7 +68,6 @@ export default [
 
     // Admin routes
     ...prefix("admin", [
-      index("routes/admin/index.tsx"),
       route("users", "routes/admin/users.tsx"),
       route("contests", "routes/admin/contests.tsx"),
       route("contests/:contestId", "routes/admin/contests.$contestId.tsx"),
@@ -82,6 +81,7 @@ export default [
       route("clarifications", "routes/admin/clarifications.tsx"),
       route("announcements", "routes/admin/announcements.tsx"),
       route("submissions", "routes/admin/submissions.tsx"),
+      route("submissions/:subId", "routes/admin/submissions.$subId.tsx"),
     ]),
   ]),
 ] satisfies RouteConfig;

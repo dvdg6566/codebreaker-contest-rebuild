@@ -42,10 +42,6 @@ export function meta({ params }: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  // Redirect to admin route - only admins should access submissions directly
-  const { redirect } = await import("react-router");
-  return redirect(`/admin/submissions/${params.subId}`);
-
   const { requireAdmin } = await import("~/lib/auth.server");
   const { getSubmission, getSubmissionVerdict } = await import("~/lib/db/submissions.server");
   const { getProblem } = await import("~/lib/db/problems.server");

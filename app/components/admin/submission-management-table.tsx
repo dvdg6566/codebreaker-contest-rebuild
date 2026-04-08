@@ -33,7 +33,7 @@ const submissionColumns: ColumnDef<SubmissionRow>[] = [
       const subId = row.getValue("subId") as number;
       return (
         <Link
-          to={`/submissions/${subId}`}
+          to={`/admin/submissions/${subId}`}
           className="font-mono text-primary hover:underline"
         >
           {subId}

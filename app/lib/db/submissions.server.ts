@@ -48,6 +48,7 @@ export async function listSubmissions(
   );
 
   const items = (result.Items || []) as Submission[];
+
   const nextCursor = result.LastEvaluatedKey
     ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString("base64")
     : null;
@@ -217,6 +218,7 @@ export async function createSubmission(
     maxMemory: 0,
   };
 
+  // Create the submission record immediately for UI feedback
   await docClient.send(
     new PutCommand({
       TableName: TableNames.submissions,

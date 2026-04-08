@@ -9,6 +9,7 @@ import {
   Trash2,
   Users,
   FileText,
+  FileCode,
   Clock,
   Globe,
   Lock,
@@ -72,7 +73,10 @@ import {
   getContestStatus,
   listProblems,
   listUsers,
+  getSubmissionsByContest,
 } from "~/lib/db/index.server";
+import { SubmissionManagementTable } from "~/components/admin/submission-management-table";
+import type { SubmissionRow } from "~/components/admin/submission-management-table";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { requireAdmin } = await import("~/lib/auth.server");
@@ -85,25 +89,65 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const status = getContestStatus(contest);
 
-  // Get all available problems
-  const problems = await listProblems();
+  // Get all available problems and users, plus contest submissions
+  const [problems, users, submissions] = await Promise.all([
+    listProblems(),
+    listUsers(),
+    getSubmissionsByContest(params.contestId, 500),
+  ]);
+
   const allProblems = problems.map((p) => ({
     problemName: p.problemName,
     title: p.title,
   }));
 
-  // Get all users for adding to contest
-  const users = await listUsers();
   const allUsers = users.map((u) => ({
     username: u.username,
     role: u.role,
   }));
+
+  // Format submissions for display
+  const { getSubmissionVerdict } = await import("~/lib/db/submissions.server");
+  const problemMap = new Map(problems.map((p) => [p.problemName, p]));
+
+  const submissionRows: SubmissionRow[] = submissions.map((sub) => {
+    const problem = problemMap.get(sub.problemName);
+    const maxScore = problem
+      ? problem.subtaskScores.reduce((sum, s) => sum + s, 0)
+      : 100;
+
+    return {
+      subId: sub.subId,
+      username: sub.username,
+      problemName: sub.problemName,
+      problemTitle: problem?.title || sub.problemName,
+      language: sub.language,
+      languageDisplay:
+        sub.language === "cpp"
+          ? "C++ 17"
+          : sub.language === "py"
+          ? "Python 3"
+          : sub.language === "java"
+          ? "Java"
+          : sub.language,
+      verdict: getSubmissionVerdict(sub),
+      score: sub.totalScore,
+      maxScore,
+      contestId: sub.contestId || "legacy",
+      contestDisplay: sub.contestId === "global" ? "Admin" : (sub.contestId || "Legacy"),
+      time: sub.gradingCompleteTime && sub.maxTime
+        ? (sub.maxTime / 1000).toFixed(2)
+        : "N/A",
+      submissionTime: sub.submissionTime,
+    };
+  });
 
   return {
     contest,
     status,
     allProblems,
     allUsers,
+    submissionRows,
   };
 }
 
@@ -250,7 +294,7 @@ function formatDateTimeLocal(dateStr: string): string {
 }
 
 export default function EditContestPage({ loaderData, actionData }: Route.ComponentProps) {
-  const { contest, status, allProblems, allUsers } = loaderData;
+  const { contest, status, allProblems, allUsers, submissionRows } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const [selectedMode, setSelectedMode] = useState<ContestMode>(contest.mode || "centralized");
@@ -362,6 +406,10 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
           <TabsTrigger value="users">
             <Users className="mr-2 h-4 w-4" />
             Participants ({Object.keys(contest.users || {}).length})
+          </TabsTrigger>
+          <TabsTrigger value="submissions">
+            <FileCode className="mr-2 h-4 w-4" />
+            Submissions ({submissionRows.length})
           </TabsTrigger>
         </TabsList>
 
@@ -854,6 +902,29 @@ export default function EditContestPage({ loaderData, actionData }: Route.Compon
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Submissions Tab */}
+        <TabsContent value="submissions" className="space-y-6">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle>Contest Submissions</CardTitle>
+              <CardDescription>
+                View all submissions made to problems in this contest ({submissionRows.length} total)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {submissionRows.length > 0 ? (
+                <SubmissionManagementTable data={submissionRows} />
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <FileCode className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No submissions yet</h3>
+                  <p>Submissions will appear here once participants start submitting solutions.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

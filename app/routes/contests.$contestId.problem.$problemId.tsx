@@ -536,7 +536,7 @@ export default function ContestProblem({ loaderData, actionData }: Route.Compone
                           score={submission.totalScore}
                         />
                         <Button asChild size="sm" variant="ghost">
-                          <Link to={`/submissions/${submission.subId}`}>
+                          <Link to={`/contests/${contestId}/submissions/${submission.subId}`}>
                             <Eye className="h-4 w-4" />
                           </Link>
                         </Button>

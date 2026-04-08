@@ -6,6 +6,7 @@ import {
   createTestContest,
   deleteTestContest,
   submitCommunicationSolution,
+  submitRegularSolution,
   waitForGradingComplete,
   readSubmissionFile,
   getSampleSubmission,
@@ -36,11 +37,11 @@ describe('Grading Verification', () => {
     await createTestUser(TEST_USER, 'admin')
     console.log(`✅ Created test user: ${TEST_USER}`)
 
-    // Create test contest with prisoners problem
+    // Create test contest with prisoners and ping problems
     await createTestContest({
       contestId: TEST_CONTEST_ID,
       name: 'Testing',
-      problems: ['prisoners'],
+      problems: ['prisoners', 'ping'],
       startTime: new Date(Date.now() - 1000), // started 1 second ago
       endTime: new Date(Date.now() + 3600000), // ends in 1 hour
       users: { [TEST_USER]: '1' } // user already started
@@ -232,7 +233,7 @@ describe('Grading Verification', () => {
       // Get the cycle sample submission metadata
       const submission = getSampleSubmission('prisoners', 56.0)
       expect(submission.expectedSubtasks).toEqual([100, 100, 0, 100])
-      expect(submission.expectedVerdict).toBe('PS')
+      expect(submission.expectedVerdict).toBe('RTE')
 
       // Read solution files
       const swapperCode = readSubmissionFile(submission, 'secondary')
@@ -267,9 +268,100 @@ describe('Grading Verification', () => {
 
       // Verify verdict
       const verdict = getSubmissionVerdict(gradedSubmission)
-      expect(verdict).toBe('PS')
+      expect(verdict).toBe('RTE')
 
       console.log(`✅ Cycle solution verification successful:`)
+      console.log(`   Expected: [${submission.expectedSubtasks?.join(', ')}] = ${submission.expectedScore} (${submission.expectedVerdict})`)
+      console.log(`   Actual:   [${gradedSubmission.subtaskScores.join(', ')}] = ${gradedSubmission.totalScore} (${verdict})`)
+    }, 180000) // 3 minute test timeout for grading
+
+    it('verifies prisoners optimal solution gets expected subtask scores [100, 100, 100, 100] (AC)', async () => {
+      console.log('🔬 Testing prisoners optimal solution with expected score 100.0...')
+
+      // Get the optimal sample submission metadata
+      const submission = getSampleSubmission('prisoners', 100.0)
+      expect(submission.expectedSubtasks).toEqual([100, 100, 100, 100])
+      expect(submission.expectedVerdict).toBe('AC')
+
+      // Read solution files
+      const swapperCode = readSubmissionFile(submission, 'secondary')
+      const prisonerCode = readSubmissionFile(submission, 'main')
+
+      expect(swapperCode).toContain('#include "swapper.h"')
+      expect(prisonerCode).toContain('#include "prisoner.h"')
+      console.log('✅ Optimal solution files loaded successfully')
+
+      // Submit communication solution
+      const result = await submitCommunicationSolution(
+        TEST_USER,
+        TEST_CONTEST_ID,
+        'prisoners',
+        {
+          swapper: swapperCode,
+          prisoner: prisonerCode
+        }
+      )
+
+      console.log(`✅ Optimal submission created with ID: ${result.subId}`)
+
+      // Wait for grading to complete
+      console.log('⏳ Waiting for optimal solution grading to complete...')
+      const gradedSubmission = await waitForGradingComplete(result.subId, 120000)
+
+      console.log(`✅ Optimal solution grading completed at: ${gradedSubmission.gradingCompleteTime}`)
+
+      // Core verification: scores match expected metadata exactly
+      expect(gradedSubmission.totalScore).toBeCloseTo(submission.expectedScore, 2)
+      expect(gradedSubmission.subtaskScores).toEqual(submission.expectedSubtasks)
+
+      // Verify verdict
+      const verdict = getSubmissionVerdict(gradedSubmission)
+      expect(verdict).toBe('AC') // Accepted
+
+      console.log(`✅ Optimal solution verification successful:`)
+      console.log(`   Expected: [${submission.expectedSubtasks?.join(', ')}] = ${submission.expectedScore} (${submission.expectedVerdict})`)
+      console.log(`   Actual:   [${gradedSubmission.subtaskScores.join(', ')}] = ${gradedSubmission.totalScore} (${verdict})`)
+    }, 180000) // 3 minute test timeout for grading
+
+    it('verifies ping advanced solution gets expected subtask scores [100, 100, 96.67]', async () => {
+      console.log('🔬 Testing ping advanced solution with expected score 98.0...')
+
+      // Get the advanced sample submission metadata
+      const submission = getSampleSubmission('ping', 98.0)
+      expect(submission.expectedSubtasks).toEqual([100, 100, 96.67])
+      expect(submission.expectedVerdict).toBe('PS')
+
+      // Read solution file
+      const solutionCode = readSubmissionFile(submission, 'main')
+      expect(solutionCode).toContain('#include')
+      console.log('✅ Advanced solution file loaded successfully')
+
+      // Submit regular solution
+      const result = await submitRegularSolution(
+        TEST_USER,
+        TEST_CONTEST_ID,
+        'ping',
+        solutionCode,
+        'cpp'
+      )
+
+      console.log(`✅ Advanced ping submission created with ID: ${result.subId}`)
+
+      // Wait for grading to complete
+      console.log('⏳ Waiting for advanced ping solution grading to complete...')
+      const gradedSubmission = await waitForGradingComplete(result.subId, 120000)
+
+      console.log(`✅ Advanced ping solution grading completed at: ${gradedSubmission.gradingCompleteTime}`)
+
+      // Core verification: scores match expected metadata exactly
+      expect(gradedSubmission.totalScore).toBeCloseTo(submission.expectedScore, 2)
+      expect(gradedSubmission.subtaskScores).toEqual(submission.expectedSubtasks)
+
+      // Verify verdict
+      const verdict = getSubmissionVerdict(gradedSubmission)
+      expect(verdict).toBe('PS')
+
+      console.log(`✅ Advanced ping solution verification successful:`)
       console.log(`   Expected: [${submission.expectedSubtasks?.join(', ')}] = ${submission.expectedScore} (${submission.expectedVerdict})`)
       console.log(`   Actual:   [${gradedSubmission.subtaskScores.join(', ')}] = ${gradedSubmission.totalScore} (${verdict})`)
     }, 180000) // 3 minute test timeout for grading

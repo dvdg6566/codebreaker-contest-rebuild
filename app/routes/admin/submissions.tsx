@@ -58,7 +58,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       score: sub.totalScore,
       maxScore,
       contestId: sub.contestId || "legacy",
-      contestDisplay: sub.contestId === "global" ? "Global/Admin" : (sub.contestId || "Legacy"),
+      contestDisplay: sub.contestId === "global" ? "Admin" : (sub.contestId || "Legacy"),
       time: sub.gradingCompleteTime && sub.maxTime
         ? (sub.maxTime / 1000).toFixed(2)
         : "N/A",
