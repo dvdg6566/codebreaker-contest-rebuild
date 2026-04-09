@@ -7,14 +7,12 @@ import {
   Code2,
   Eye,
   Calendar,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Timer,
-  HardDrive,
   FileText,
   ChevronLeft
 } from "lucide-react";
+import { getVerdictIcon } from "~/lib/verdict-utils";
+import { getLanguageDisplayName } from "~/lib/languages";
+import { formatDateTime } from "~/lib/datetime-utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -69,26 +67,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   };
 }
 
-const verdictIcon = (verdict: string) => {
-  switch (verdict) {
-    case "AC":
-      return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
-    case "WA":
-      return <XCircle className="h-4 w-4 text-red-500" />;
-    case "TLE":
-      return <Timer className="h-4 w-4 text-orange-500" />;
-    case "MLE":
-      return <HardDrive className="h-4 w-4 text-purple-500" />;
-    case "RTE":
-      return <AlertCircle className="h-4 w-4 text-rose-500" />;
-    case "PS":
-      return <AlertCircle className="h-4 w-4 text-amber-500" />;
-    case "CE":
-      return <Code2 className="h-4 w-4 text-gray-500" />;
-    default:
-      return <AlertCircle className="h-4 w-4 text-gray-400" />;
-  }
-};
 
 export default function ContestSubmissions({ loaderData }: Route.ComponentProps) {
   const { contest, user, submissions, problemDetails } = loaderData;
@@ -108,13 +86,6 @@ export default function ContestSubmissions({ loaderData }: Route.ComponentProps)
     return () => clearInterval(interval);
   }, [submissions]);
 
-  const formatDateTime = (dateTime: string) => {
-    try {
-      return new Date(dateTime.replace(" ", "T") + "Z").toLocaleString();
-    } catch {
-      return dateTime;
-    }
-  };
 
   const getSubmissionVerdict = (submission: any) => {
     if (!submission.gradingCompleteTime) return "Grading...";
@@ -129,14 +100,6 @@ export default function ContestSubmissions({ loaderData }: Route.ComponentProps)
     return "PS";
   };
 
-  const getLanguageDisplay = (lang: string) => {
-    switch (lang) {
-      case "cpp": return "C++ 17";
-      case "py": return "Python 3";
-      case "java": return "Java";
-      default: return lang;
-    }
-  };
 
   // Group submissions by problem
   const submissionsByProblem = submissions.reduce((acc: any, sub: any) => {
@@ -298,12 +261,12 @@ export default function ContestSubmissions({ loaderData }: Route.ComponentProps)
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {getLanguageDisplay(submission.language)}
+                            {getLanguageDisplayName(submission.language)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
                           <div className="flex items-center justify-center gap-2">
-                            {verdictIcon(verdict)}
+                            {getVerdictIcon(verdict)}
                             <ScoreBadge verdict={verdict as VerdictType} />
                           </div>
                         </TableCell>

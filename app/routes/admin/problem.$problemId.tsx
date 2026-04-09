@@ -10,12 +10,11 @@ import {
   Download,
   Code2,
   FileCode,
-  CheckCircle2,
-  AlertCircle,
-  XCircle,
   Loader2,
   Edit,
 } from "lucide-react";
+import { getVerdictIcon } from "~/lib/verdict-utils";
+import { getLanguageDisplayName } from "~/lib/languages";
 import {
   Card,
   CardContent,
@@ -87,14 +86,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   // Get recent submissions (last 5)
   const recentSubmissions = userSubmissions.slice(0, 5).map((sub) => {
-    const languageDisplay =
-      sub.language === "cpp"
-        ? "C++ 17"
-        : sub.language === "py"
-        ? "Python 3"
-        : sub.language === "java"
-        ? "Java"
-        : sub.language;
+    const languageDisplay = getLanguageDisplayName(sub.language);
 
     return {
       id: sub.subId,
@@ -239,7 +231,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 export default function ProblemDetail({ loaderData, actionData }: Route.ComponentProps) {
   const { problemData, recentSubmissions, languages, username, isAdmin } = loaderData;
   const fetcher = useFetcher();
-  const [selectedLanguage, setSelectedLanguage] = React.useState<string>(languages[0]?.label || "C++ 17");
+  const [selectedLanguage, setSelectedLanguage] = React.useState<string>(languages[0]?.label || getLanguageDisplayName("cpp"));
   const [code, setCode] = React.useState("");
   const [codeA, setCodeA] = React.useState("");
   const [codeB, setCodeB] = React.useState("");
@@ -267,18 +259,6 @@ export default function ProblemDetail({ loaderData, actionData }: Route.Componen
     fetcher.submit(formData, { method: "post" });
   };
 
-  const verdictIcon = (verdict: string) => {
-    switch (verdict) {
-      case "AC":
-        return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
-      case "WA":
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      case "TLE":
-        return <Clock className="h-4 w-4 text-orange-500" />;
-      default:
-        return <AlertCircle className="h-4 w-4 text-amber-500" />;
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -528,7 +508,7 @@ export default function ProblemDetail({ loaderData, actionData }: Route.Componen
                       className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        {verdictIcon(sub.verdict)}
+                        {getVerdictIcon(sub.verdict)}
                         <div>
                           <div className="text-sm font-medium">#{sub.id}</div>
                           <div className="text-xs text-muted-foreground">

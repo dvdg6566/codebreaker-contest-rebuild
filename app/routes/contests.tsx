@@ -22,6 +22,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { StatusBadge } from "~/components/ui/status-badge";
 import type { UserContestView, ContestStatus, UserContestStatus } from "~/types/database";
+import { formatDateTimeWithFallback } from "~/lib/datetime-utils";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { requireAuth } = await import("~/lib/auth.server");
@@ -131,17 +132,6 @@ const formatTime = (seconds: number) => {
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 };
 
-// Utility function to format datetime for display
-const formatDateTime = (dateTimeStr: string) => {
-  if (dateTimeStr === "9999-12-31 23:59:59") return "Not set";
-
-  try {
-    const date = new Date(dateTimeStr.replace(" ", "T") + "Z");
-    return date.toLocaleString();
-  } catch {
-    return "Invalid date";
-  }
-};
 
 export default function Contests({ loaderData, actionData }: Route.ComponentProps) {
   const { contests } = loaderData;
@@ -311,13 +301,13 @@ function ContestCard({ contest }: { contest: UserContestView }) {
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-gray-500" />
               <span className="text-gray-600">Start:</span>
-              <span>{formatDateTime(contest.startTime)}</span>
+              <span>{formatDateTimeWithFallback(contest.startTime)}</span>
             </div>
 
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-gray-500" />
               <span className="text-gray-600">End:</span>
-              <span>{formatDateTime(contest.endTime)}</span>
+              <span>{formatDateTimeWithFallback(contest.endTime)}</span>
             </div>
           </div>
 

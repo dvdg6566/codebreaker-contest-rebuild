@@ -10,12 +10,11 @@ import {
   Code2,
   Send,
   Eye,
-  Calendar,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Timer
+  Calendar
 } from "lucide-react";
+import { getVerdictIcon } from "~/lib/verdict-utils";
+import { getLanguageOptions } from "~/lib/languages";
+import { formatDateTime } from "~/lib/datetime-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -254,24 +253,6 @@ function ProblemStatement({ problemId }: { problemId: string }) {
   );
 }
 
-const verdictIcon = (verdict: string) => {
-  switch (verdict) {
-    case "AC":
-      return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
-    case "WA":
-      return <XCircle className="h-4 w-4 text-red-500" />;
-    case "TLE":
-      return <Timer className="h-4 w-4 text-orange-500" />;
-    case "MLE":
-      return <HardDrive className="h-4 w-4 text-purple-500" />;
-    case "RTE":
-      return <AlertCircle className="h-4 w-4 text-rose-500" />;
-    case "PS":
-      return <AlertCircle className="h-4 w-4 text-amber-500" />;
-    default:
-      return <AlertCircle className="h-4 w-4 text-gray-400" />;
-  }
-};
 
 export default function ContestProblem({ loaderData, actionData }: Route.ComponentProps) {
   const { contest, problem, user, canSubmit, submissions, maxScore, subtasks } = loaderData;
@@ -304,13 +285,6 @@ export default function ContestProblem({ loaderData, actionData }: Route.Compone
     return () => clearInterval(interval);
   }, [submissions]);
 
-  const formatDateTime = (dateTime: string) => {
-    try {
-      return new Date(dateTime.replace(" ", "T") + "Z").toLocaleString();
-    } catch {
-      return dateTime;
-    }
-  };
 
   const getSubmissionVerdict = (submission: any) => {
     if (!submission.gradingCompleteTime) return "Grading...";
@@ -432,9 +406,11 @@ export default function ContestProblem({ loaderData, actionData }: Route.Compone
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cpp">C++ 17</SelectItem>
-                        <SelectItem value="py">Python 3</SelectItem>
-                        <SelectItem value="java">Java</SelectItem>
+                        {getLanguageOptions().map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -522,7 +498,7 @@ export default function ContestProblem({ loaderData, actionData }: Route.Compone
                       className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
                     >
                       <div className="flex items-center gap-3">
-                        {verdictIcon(getSubmissionVerdict(submission))}
+                        {getVerdictIcon(getSubmissionVerdict(submission))}
                         <div>
                           <div className="font-medium">#{submission.subId}</div>
                           <div className="text-xs text-gray-500">

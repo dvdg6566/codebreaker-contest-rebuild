@@ -78,6 +78,7 @@ import {
 } from "~/lib/db/index.server";
 import { SubmissionManagementTable } from "~/components/admin/submission-management-table";
 import type { SubmissionRow } from "~/components/admin/submission-management-table";
+import { getLanguageDisplayName } from "~/lib/languages";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { requireAdmin } = await import("~/lib/auth.server");
@@ -123,14 +124,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       problemName: sub.problemName,
       problemTitle: problem?.title || sub.problemName,
       language: sub.language,
-      languageDisplay:
-        sub.language === "cpp"
-          ? "C++ 17"
-          : sub.language === "py"
-          ? "Python 3"
-          : sub.language === "java"
-          ? "Java"
-          : sub.language,
+      languageDisplay: getLanguageDisplayName(sub.language),
       verdict: getSubmissionVerdict(sub),
       score: sub.totalScore,
       maxScore,

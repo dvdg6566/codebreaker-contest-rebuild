@@ -7,14 +7,12 @@ import {
   Clock,
   HardDrive,
   Code2,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Timer,
   Copy,
   Download,
   Calendar,
 } from "lucide-react";
+import { getVerdictIcon } from "~/lib/verdict-utils";
+import { getLanguageDisplayName } from "~/lib/languages";
 import {
   Card,
   CardContent,
@@ -146,14 +144,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const maxScore = subtaskScores.reduce((sum, s) => sum + s, 0);
 
   // Get display language
-  const languageDisplay =
-    submission.language === "cpp"
-      ? "C++ 17"
-      : submission.language === "py"
-      ? "Python 3"
-      : submission.language === "java"
-      ? "Java"
-      : submission.language;
+  const languageDisplay = getLanguageDisplayName(submission.language);
 
   return {
     contestId,
@@ -182,24 +173,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   };
 }
 
-const verdictIcon = (verdict: string) => {
-  switch (verdict) {
-    case "AC":
-      return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
-    case "WA":
-      return <XCircle className="h-4 w-4 text-red-500" />;
-    case "TLE":
-      return <Timer className="h-4 w-4 text-orange-500" />;
-    case "MLE":
-      return <HardDrive className="h-4 w-4 text-purple-500" />;
-    case "RTE":
-      return <AlertCircle className="h-4 w-4 text-rose-500" />;
-    case "PS":
-      return <AlertCircle className="h-4 w-4 text-amber-500" />;
-    default:
-      return <AlertCircle className="h-4 w-4 text-gray-400" />;
-  }
-};
 
 export default function ContestSubmissionDetail({ loaderData }: Route.ComponentProps) {
   const { contestId, submissionData } = loaderData;
@@ -271,7 +244,7 @@ export default function ContestSubmissionDetail({ loaderData }: Route.ComponentP
                   <CollapsibleTrigger className="w-full">
                     <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
                       <div className="flex items-center gap-3">
-                        {verdictIcon(subtask.verdict)}
+                        {getVerdictIcon(subtask.verdict)}
                         <span className="font-medium">Subtask {subtask.id}</span>
                         <Badge variant="outline" className="text-xs">
                           {subtask.testcases.length} testcases

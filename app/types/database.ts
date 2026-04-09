@@ -415,16 +415,6 @@ export function getClarificationStatus(
 // GLOBAL COUNTERS TABLE
 // =============================================================================
 
-/**
- * Global counter for ID generation
- * PK: counterId
- */
-export interface GlobalCounter {
-  /** Counter name, e.g., "submissionId" */
-  counterId: string;
-  /** Current counter value */
-  value: number;
-}
 
 // =============================================================================
 // UTILITY TYPES

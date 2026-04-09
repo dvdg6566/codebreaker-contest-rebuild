@@ -1,4 +1,4 @@
-import { Outlet, redirect } from "react-router";
+import { Outlet } from "react-router";
 import { AppLayout } from "~/components/layout/app-layout";
 import type { Route } from "./+types/layout";
 

@@ -34,6 +34,7 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { getInitials } from "~/lib/utils";
+import { getLanguageDisplayName } from "~/lib/languages";
 
 // Helper to consolidate problem scores from all contests
 function getAllProblemScores(contestScores: Record<string, Record<string, number>>): Record<string, number> {
@@ -104,14 +105,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const recentSubmissions = await Promise.all(
     recentSubmissionData.map(async (sub) => {
       const problem = await getProblem(sub.problemName);
-      const languageDisplay =
-        sub.language === "cpp"
-          ? "C++ 17"
-          : sub.language === "py"
-          ? "Python 3"
-          : sub.language === "java"
-          ? "Java"
-          : sub.language;
+      const languageDisplay = getLanguageDisplayName(sub.language);
 
       return {
         id: sub.subId,

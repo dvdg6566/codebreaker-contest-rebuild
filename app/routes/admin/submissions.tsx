@@ -8,6 +8,7 @@ import {
   type SubmissionRow,
 } from "~/components/admin/submission-management-table";
 import { Button } from "~/components/ui/button";
+import { getLanguageDisplayName } from "~/lib/languages";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -46,14 +47,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       problemName: sub.problemName,
       problemTitle: problem?.title || sub.problemName,
       language: sub.language,
-      languageDisplay:
-        sub.language === "cpp"
-          ? "C++ 17"
-          : sub.language === "py"
-          ? "Python 3"
-          : sub.language === "java"
-          ? "Java"
-          : sub.language,
+      languageDisplay: getLanguageDisplayName(sub.language),
       verdict: getSubmissionVerdict(sub),
       score: sub.totalScore,
       maxScore,

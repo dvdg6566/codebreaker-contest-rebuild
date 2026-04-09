@@ -6,6 +6,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { useCountdown, formatTime } from "~/hooks/useCountdown";
 import { useContestWebSocket } from "~/hooks/useContestWebSocket";
+import { formatDateTimeWithFallback } from "~/lib/datetime-utils";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { contestId } = params;
@@ -84,16 +85,6 @@ export default function ContestIndex({ loaderData, actionData }: Route.Component
   // Use countdown hook for real-time updates when contest is active
   const timeRemaining = useCountdown(contestStatus.timeRemaining || 0);
 
-  const formatDateTime = (dateTimeStr: string) => {
-    if (dateTimeStr === "9999-12-31 23:59:59") return "Not set";
-
-    try {
-      const date = new Date(dateTimeStr.replace(" ", "T") + "Z");
-      return date.toLocaleString();
-    } catch {
-      return "Invalid date";
-    }
-  };
 
   const totalScore = userScores ? Object.values(userScores).reduce((sum: number, score: number) => sum + score, 0) : 0;
   const solvedProblems = userScores ? Object.values(userScores).filter((score: number) => score > 0).length : 0;
@@ -230,13 +221,13 @@ export default function ContestIndex({ loaderData, actionData }: Route.Component
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-gray-500" />
               <span className="text-gray-600">Start:</span>
-              <span>{formatDateTime(contest.startTime)}</span>
+              <span>{formatDateTimeWithFallback(contest.startTime)}</span>
             </div>
 
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-gray-500" />
               <span className="text-gray-600">End:</span>
-              <span>{formatDateTime(contest.endTime)}</span>
+              <span>{formatDateTimeWithFallback(contest.endTime)}</span>
             </div>
           </div>
         </CardContent>

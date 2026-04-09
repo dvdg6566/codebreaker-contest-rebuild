@@ -52,10 +52,10 @@ export function getLanguageIdFromName(name: string): LanguageId | null {
 }
 
 /**
- * Check if a language is supported
+ * Get display name for a language ID
  */
-export function isValidLanguage(id: string): id is LanguageId {
-  return id in LANGUAGES;
+export function getLanguageDisplayName(id: string): string {
+  return LANGUAGES[id as LanguageId]?.name || id;
 }
 
 /**

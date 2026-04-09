@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
+import { contestOngoing } from "~/lib/contest-utils";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { contestId } = params;
@@ -66,21 +67,11 @@ export default function ContestScoreboard({ loaderData }: Route.ComponentProps) 
   useContestWebSocket(contest.contestId);
 
   // Check if contest is still ongoing for auto-refresh
-  const isContestOngoing = (() => {
-    if (!contest?.endTime || contest.endTime === "9999-12-31 23:59:59") return false;
-
-    try {
-      const now = new Date();
-      const endTime = new Date(contest.endTime.replace(" ", "T") + "Z");
-      return now < endTime;
-    } catch {
-      return false;
-    }
-  })();
+  const contestOngoing = isContestOngoing(contest);
 
   // Auto-refresh scoreboard every 30 seconds during active contest
   useEffect(() => {
-    if (!isContestOngoing) return;
+    if (!contestOngoing) return;
 
     const interval = setInterval(() => {
       // Only refresh if page is visible to save bandwidth
@@ -90,7 +81,7 @@ export default function ContestScoreboard({ loaderData }: Route.ComponentProps) 
     }, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
-  }, [isContestOngoing, revalidator]);
+  }, [contestOngoing, revalidator]);
 
   const formatTime = (minutes: number) => {
     const h = Math.floor(minutes / 60);
@@ -127,7 +118,7 @@ export default function ContestScoreboard({ loaderData }: Route.ComponentProps) 
             {contest.contestName} - Scoreboard
           </h1>
         </div>
-        {isContestOngoing && (
+        {contestOngoing && (
           <Badge variant="outline" className="text-xs">
             <Clock className="h-3 w-3 mr-1" />
             Auto-refreshes every 30s
