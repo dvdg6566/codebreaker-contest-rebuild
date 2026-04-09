@@ -102,10 +102,8 @@ async function createUsers(): Promise<void> {
     try {
       const existingAdmin = await cognito.getUser("admin");
       if (!existingAdmin) {
-        console.log("[init] Creating admin user...");
         await cognito.createUser("admin", DEFAULT_PASSWORD, "admin", adminEmail);
         await createDbUser("admin", "admin", { fullname: "Admin User", email: adminEmail });
-        console.log("[init] Admin user created");
       }
     } catch (error) {
       console.error("[init] Error creating admin:", error);
@@ -117,7 +115,6 @@ async function createUsers(): Promise<void> {
     try {
       const existing = await cognito.getUser(user.username);
       if (!existing) {
-        console.log(`[init] Creating user: ${user.username}`);
         await cognito.createUser(user.username, DEFAULT_PASSWORD, "member", user.email);
         await createDbUser(user.username, "member", { fullname: user.fullname, email: user.email });
       }
@@ -135,7 +132,6 @@ async function uploadProblems(): Promise<void> {
   const problemsDir = getProblemsDir();
 
   if (!problemsDir || !existsSync(problemsDir)) {
-    console.log("[init] No problems directory found, skipping problem upload");
     return;
   }
 
@@ -190,11 +186,9 @@ async function uploadProblems(): Promise<void> {
     const problemDir = join(problemsDir, problemName);
 
     if (!existsSync(problemDir)) {
-      console.log(`[init] Problem directory not found: ${problemName}`);
       continue;
     }
 
-    console.log(`[init] Uploading problem: ${problemName}`);
 
     try {
       // Create problem record
@@ -272,7 +266,6 @@ async function uploadProblems(): Promise<void> {
         validated: true,
       });
 
-      console.log(`[init] Problem ${problemName} uploaded successfully`);
     } catch (error) {
       console.error(`[init] Error uploading problem ${problemName}:`, error);
     }
@@ -311,7 +304,6 @@ async function compileCheckers(): Promise<void> {
 
   for (const problemName of ["ping", "prisoners"]) {
     try {
-      console.log(`[init] Compiling checker for ${problemName}...`);
 
       const response = await lambdaClient.send(
         new InvokeCommand({
@@ -327,7 +319,6 @@ async function compileCheckers(): Promise<void> {
       const result = JSON.parse(new TextDecoder().decode(response.Payload));
 
       if (result.status === 200) {
-        console.log(`[init] Checker compiled for ${problemName}`);
       } else {
         console.error(`[init] Checker compilation failed for ${problemName}:`, result.error);
       }
@@ -351,11 +342,9 @@ async function createContestData(): Promise<void> {
     // Check if contest already exists
     const existing = await getContest(contestId);
     if (existing) {
-      console.log("[init] Contest already exists, skipping");
       return;
     }
 
-    console.log("[init] Creating sample contest...");
 
     const now = new Date();
     const startTime = new Date(now.getTime() - 5 * 60 * 60 * 1000);
@@ -414,7 +403,6 @@ async function createContestData(): Promise<void> {
       }
     }
 
-    console.log("[init] Contest created successfully");
   } catch (error) {
     console.error("[init] Error creating contest:", error);
   }

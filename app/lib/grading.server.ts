@@ -45,7 +45,6 @@ export async function startGrading(params: {
     submissionTime,
   } = params;
 
-  // Determine if grader is needed
   const grader = problemType !== "Batch";
 
   const input = {
@@ -108,7 +107,6 @@ export async function regradeProblem(
   const submissions = await getSubmissionsByProblem(problemName);
   let filtered = submissions;
 
-  // Filter by regrade type
   switch (regradeType) {
     case "AC":
       filtered = submissions.filter((s) => s.totalScore === 100);
@@ -121,7 +119,6 @@ export async function regradeProblem(
       break;
   }
 
-  // Start regrading
   for (const submission of filtered) {
     await regradeSubmission(submission.subId);
   }

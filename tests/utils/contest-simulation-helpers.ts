@@ -39,7 +39,6 @@ export async function createContestWithUsers(config: ContestSimulationConfig): P
 
   // Create contest with all users started (centralized contests auto-start users)
   const usersObject = Object.fromEntries(config.users.map(u => [u, '1'])) // all started (centralized mode)
-  console.log(`DEBUG: Creating contest ${config.contestId} with users:`, usersObject)
 
   await createTestContest({
     contestId: config.contestId,
@@ -50,12 +49,10 @@ export async function createContestWithUsers(config: ContestSimulationConfig): P
     users: usersObject
   })
 
-  console.log(`DEBUG: Contest ${config.contestId} created, verifying user participation...`)
 
   // Verify users were added properly
   for (const user of config.users) {
     const activeContests = await getUserActiveContests(user)
-    console.log(`DEBUG: User ${user} has active contests:`, Object.keys(activeContests))
   }
 }
 
@@ -149,10 +146,8 @@ export async function waitForContestStart(contestId: string, timeout: number = 3
     }
 
     const status = getContestStatus(contest)
-    console.log(`DEBUG: Contest ${contestId} status: ${status}`)
 
     if (status === 'ONGOING') {
-      console.log(`✅ Contest ${contestId} is now ONGOING`)
       return // Contest started
     }
 
@@ -302,12 +297,10 @@ export function delay(ms: number): Promise<void> {
  */
 export async function verifyUserContestStatus(username: string, contestId: string, expectedStatus: string): Promise<void> {
   const activeContests = await getUserActiveContests(username)
-  console.log(`DEBUG: User ${username} active contests:`, Object.keys(activeContests))
 
   const participation = activeContests[contestId]
 
   if (!participation) {
-    console.log(`DEBUG: All active contests for ${username}:`, activeContests)
     throw new Error(`User ${username} not found in contest ${contestId}. Available contests: ${Object.keys(activeContests).join(', ')}`)
   }
 

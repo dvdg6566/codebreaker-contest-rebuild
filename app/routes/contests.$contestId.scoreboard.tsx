@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { contestOngoing } from "~/lib/contest-utils";
+import { isContestOngoing } from "~/lib/contest-utils";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { contestId } = params;
@@ -48,7 +48,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   }
   // Public visibility allows any authenticated user
 
-  // Get scoreboard data
   const scoreboard = await getScoreboard(contestId);
 
   return {

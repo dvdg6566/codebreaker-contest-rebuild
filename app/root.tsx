@@ -22,7 +22,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { getCurrentUser } = await import("~/lib/auth.server");
   const session = await getCurrentUser(request);
 
-  // Get WebSocket endpoint from environment
   const wsEndpoint = process.env.API_GATEWAY_LINK || null;
 
   if (!session) {

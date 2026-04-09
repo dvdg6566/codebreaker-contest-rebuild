@@ -19,7 +19,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const problemName = params.problemId;
 
-  // Verify problem exists
   const problem = await getProblem(problemName);
   if (!problem) {
     return Response.json({ error: "Problem not found" }, { status: 404 });

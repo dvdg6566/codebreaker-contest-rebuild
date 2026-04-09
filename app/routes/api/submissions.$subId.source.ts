@@ -19,7 +19,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     return Response.json({ error: "Invalid submission ID" }, { status: 400 });
   }
 
-  // Get submission
   const submission = await getSubmission(subId);
   if (!submission) {
     return Response.json({ error: "Submission not found" }, { status: 404 });
@@ -66,7 +65,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       },
     });
   } else {
-    // Get single source file
     const code = await getSubmissionSource(subId, submission.language);
 
     if (!code) {

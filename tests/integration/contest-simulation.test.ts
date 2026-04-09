@@ -33,7 +33,6 @@ const USERS = ['alice', 'bob', 'charlie'] // 3 test users
 
 describe('Contest Simulation', () => {
   beforeAll(async () => {
-    console.log('🏁 Setting up comprehensive contest simulation...')
 
     // Create contest with multiple users and all 3 problems
     await createContestWithUsers({
@@ -45,18 +44,14 @@ describe('Contest Simulation', () => {
       name: 'Contest Simulation Test'
     })
 
-    console.log(`✅ Created 10-minute contest simulation with users: ${USERS.join(', ')}`)
   }, 45000) // 45 second timeout for setup
 
   afterAll(async () => {
-    console.log('🧹 Cleaning up contest simulation...')
     await cleanupContestSimulation(CONTEST_ID, USERS)
-    console.log('✅ Contest simulation cleanup completed')
   })
 
   describe('Multi-User Contest Participation', () => {
     it('verifies multiple users are participating in centralized contest', async () => {
-      console.log('👥 Testing multi-user centralized contest participation...')
 
       // Wait for contest to actually start
       await waitForContestStart(CONTEST_ID)
@@ -66,13 +61,11 @@ describe('Contest Simulation', () => {
         await verifyUserContestStatus(user, CONTEST_ID, 'started')
       }
 
-      console.log(`✅ All ${USERS.length} users automatically participating in centralized contest`)
     }, 30000) // 30 second timeout
   })
 
   describe('Concurrent Submission & Leaderboard Evolution', () => {
     it('simulates concurrent submissions with real-time leaderboard updates', async () => {
-      console.log('📊 Testing concurrent submissions and leaderboard evolution...')
 
       // Wait for contest to be ONGOING before submitting
       await waitForContestStart(CONTEST_ID)
@@ -89,16 +82,13 @@ describe('Contest Simulation', () => {
 
       // Submit solutions sequentially and capture leaderboard after each
       for (const [index, sub] of submissions.entries()) {
-        console.log(`   [${index + 1}/4] ${sub.user} submitting ${sub.problem}/${sub.solution}...`)
 
         try {
           await delay(sub.delay)
           const result = await submitTestSolution(sub.user, CONTEST_ID, sub.problem, sub.solution)
-          console.log(`   ✅ Submitted: ${sub.user} ${sub.problem}/${sub.solution} -> subId=${result.subId}`)
 
           // Wait for this specific submission to complete grading
           await waitForGradingComplete(result.subId, 120000)
-          console.log(`   ✅ Grading complete for ${sub.user} subId=${result.subId}`)
 
           // Capture leaderboard state
           try {
@@ -110,8 +100,6 @@ describe('Contest Simulation', () => {
               leaderboard
             })
 
-            console.log(`   📈 Leaderboard after ${sub.user}'s submission: ${leaderboard.length} users ranked`)
-            console.log(`   📊 Scores: ${leaderboard.map(u => `${u.username}=${u.totalScore}`).join(', ')}`)
           } catch (error) {
             console.error(`   ❌ Error getting leaderboard after ${sub.user}'s submission:`, error)
             // Push a placeholder so we can continue
@@ -132,35 +120,14 @@ describe('Contest Simulation', () => {
       expect(leaderboardHistory[0].leaderboard).toHaveLength(3) // All users present from start
 
       // Get final leaderboard directly (not from history to avoid any history issues)
-      console.log(`Getting final leaderboard after all submissions...`)
       const finalLeaderboard = await getContestLeaderboard(CONTEST_ID)
-      console.log(`Final leaderboard retrieved: ${finalLeaderboard.length} users`)
 
       // Verify exact final rankings based on deterministic submissions
       // Alice: addition/python-correct (100) + ping/binary (40) = 140 pts
       // Bob: ping/optimal (100) = 100 pts
       // Charlie: addition/cpp-partial (36) = 36 pts
 
-      try {
-        console.log('Final leaderboard:', finalLeaderboard.map(u => `${u.username}: ${u.totalScore} pts`))
-
-        // Debug: print actual vs expected scores
-        console.log('Expected: Alice=140, Bob=100, Charlie=36 (after 4 submissions)')
-        console.log('Actual:', finalLeaderboard.map(u => `${u.username}=${u.totalScore}`).join(', '))
-        console.log('Full leaderboard:', JSON.stringify(finalLeaderboard, null, 2))
-      } catch (error) {
-        console.error('Error printing leaderboard:', error)
-        console.log('finalLeaderboard raw:', finalLeaderboard)
-        console.log('leaderboardHistory length:', leaderboardHistory.length)
-        console.log('leaderboardHistory[3]:', leaderboardHistory[3])
-      }
-
-      // Debug the actual leaderboard structure
-      console.log('Final leaderboard:', finalLeaderboard.map(u => `${u.username}: ${u.totalScore} pts`))
-
-      // Debug: print actual vs expected scores
-      console.log('Expected: Alice=140, Bob=100, Charlie=36')
-      console.log('Actual:', finalLeaderboard.map(u => `${u.username}=${u.totalScore}`).join(', '))
+      // Verify exact final rankings based on deterministic submissions
 
       expect(finalLeaderboard[0].username).toBe('alice') // Alice leads with 140
       expect(finalLeaderboard[0].totalScore).toBe(140)
@@ -169,13 +136,11 @@ describe('Contest Simulation', () => {
       expect(finalLeaderboard[2].username).toBe('charlie') // Charlie third with 36
       expect(finalLeaderboard[2].totalScore).toBe(36)
 
-      console.log('✅ Leaderboard evolution verified correctly')
     }, 180000) // 3 minute timeout for submissions
   })
 
   describe('Real-Time Leaderboard Accuracy', () => {
     it('verifies leaderboard ranking algorithm with diverse scores', async () => {
-      console.log('🏆 Testing leaderboard ranking accuracy...')
 
       // Ensure contest is still ONGOING
       await waitForContestStart(CONTEST_ID)
@@ -206,13 +171,11 @@ describe('Contest Simulation', () => {
       expect(finalLeaderboard[2].username).toBe('charlie')
       expect(finalLeaderboard[2].totalScore).toBe(46) // 36 + 10
 
-      console.log('✅ Final leaderboard rankings verified')
     }, 120000) // 2 minute timeout
   })
 
   describe('Automated Contest End via Lambda-Step Function Window', () => {
     it('tests automated contest end notification system', async () => {
-      console.log('⏰ Testing automated contest end via EventBridge + Step Function...')
 
       // Create a short contest specifically for testing automated end
       const shortContestId = `end-test-${Date.now()}`
@@ -227,7 +190,6 @@ describe('Contest Simulation', () => {
         name: 'Contest End Test'
       })
 
-      console.log(`📅 Created short contest ${shortContestId} (1.5 minutes)`)
 
       // Wait for short contest to start (centralized mode - users auto-participate)
       await waitForContestStart(shortContestId)
@@ -236,12 +198,10 @@ describe('Contest Simulation', () => {
       await submitTestSolution('alice', shortContestId, 'addition', 'python-correct')
       await submitTestSolution('bob', shortContestId, 'addition', 'cpp-partial')
 
-      console.log('📝 Submissions made, waiting for automated contest end...')
 
       // Wait for automated contest end (EventBridge Scheduler triggers)
       await waitForContestEnd(shortContestId)
 
-      console.log('🏁 Contest ended automatically via EventBridge Scheduler')
 
       // Verify automated contest end flow worked:
       // 1. EventBridge triggered contest-end-notifier Lambda
@@ -260,7 +220,6 @@ describe('Contest Simulation', () => {
         submitTestSolution('alice', shortContestId, 'addition', 'python-correct')
       ).rejects.toThrow()
 
-      console.log('✅ Automated contest end verified - EventBridge → Lambda → Step Function flow worked')
 
       // Cleanup the short contest
       await cleanupContestSimulation(shortContestId, []) // Don't delete users (reused)
@@ -269,7 +228,6 @@ describe('Contest Simulation', () => {
 
   describe('Contest State Transitions', () => {
     it('verifies contest lifecycle state management', async () => {
-      console.log('🔄 Testing contest state transitions...')
 
       // Test the main contest state throughout its lifecycle
       const { getContest, getContestStatus } = await import('~/lib/db/contests.server')
@@ -285,16 +243,13 @@ describe('Contest Simulation', () => {
       if (currentStatus === 'ONGOING') {
         const testSubmission = await submitTestSolution('charlie', CONTEST_ID, 'prisoners', 'brute')
         expect(testSubmission.subId).toBeTypeOf('number')
-        console.log('✅ Submissions allowed during ONGOING state')
       }
 
-      console.log(`📊 Contest ${CONTEST_ID} status: ${currentStatus}`)
     }, 30000)
   })
 
   describe('Multi-Contest Participation', () => {
     it('tests users participating in multiple contests simultaneously', async () => {
-      console.log('🔀 Testing multi-contest participation...')
 
       // Create a second contest overlapping with the main one
       const secondContestId = `multi-contest-${Date.now()}`
@@ -315,7 +270,6 @@ describe('Contest Simulation', () => {
       const { getUserActiveContests } = await import('~/lib/db/users.server')
 
       const aliceContests = await getUserActiveContests('alice')
-      console.log('Alice active contests:', Object.keys(aliceContests))
 
       expect(Object.keys(aliceContests)).toContain(CONTEST_ID)
       expect(Object.keys(aliceContests)).toContain(secondContestId)
@@ -324,7 +278,6 @@ describe('Contest Simulation', () => {
       await submitTestSolution('alice', CONTEST_ID, 'ping', 'advanced') // First contest
       await submitTestSolution('alice', secondContestId, 'ping', 'optimal') // Second contest
 
-      console.log('✅ Multi-contest participation verified')
 
       // Cleanup second contest
       await cleanupContestSimulation(secondContestId, []) // Don't delete users

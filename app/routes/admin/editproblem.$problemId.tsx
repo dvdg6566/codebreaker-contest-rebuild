@@ -93,10 +93,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Problem not found", { status: 404 });
   }
 
-  // Get validation status (cached from DynamoDB, doesn't re-validate)
   const validation = await validateProblemFiles(problemName);
-
-  // Fetch existing file info in parallel
   const [statementExists, hasCheckerSource, hasCompiledChecker, graderFiles, hasAttachment] = await Promise.all([
     checkStatementExists(problemName),
     checkerSourceExists(problemName),
@@ -105,7 +102,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     attachmentExists(problemName),
   ]);
 
-  // Build existing files info (URLs generated on-demand when download is clicked)
   const existingFiles: {
     statements: { name: string; format: "html" | "pdf" }[];
     checker: { source: boolean; compiled: boolean };
@@ -118,7 +114,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     attachment: { exists: hasAttachment },
   };
 
-  // Record which statement formats exist
   if (statementExists.html) {
     existingFiles.statements.push({ name: `${problemName}.html`, format: "html" });
   }
@@ -253,7 +248,6 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
   const fetcher = useFetcher();
   const revalidator = useRevalidator();
 
-  // Local state for editing
   const [problem, setProblem] = React.useState<Problem>(() => initialProblem);
   const [subtasks, setSubtasks] = React.useState<Subtask[]>(() =>
     initialProblem.subtaskScores.map((score, i) => ({
@@ -263,7 +257,6 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
     }))
   );
 
-  // Update local state when loader data changes
   React.useEffect(() => {
     setProblem(initialProblem);
     setSubtasks(
@@ -284,7 +277,6 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
 
   const isLoading = fetcher.state !== "idle";
 
-  // DnD sensors for drag and drop
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -293,7 +285,6 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
   );
 
 
-  // Upload status state
   const [uploadStatus, setUploadStatus] = React.useState<{
     type: string;
     success: boolean;
@@ -345,7 +336,6 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
   };
 
 
-  // Upload file handler
   const handleUploadFile = async (
     type: "statement" | "checker" | "grader" | "header" | "attachment",
     rawFiles: File[],
@@ -408,7 +398,6 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
         });
       }
 
-      // Clear file selection and refresh data
       revalidator.revalidate();
     } catch (error) {
       setUploadStatus({
@@ -421,7 +410,6 @@ export default function EditProblemPage({ loaderData, actionData }: Route.Compon
     }
   };
 
-  // Compute selected options from problem state
   const selectedOptions = React.useMemo(() => {
     const selected: string[] = [];
     if (problem.fullFeedback) selected.push("fullFeedback");

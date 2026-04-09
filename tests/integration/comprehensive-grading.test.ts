@@ -35,11 +35,9 @@ const TEST_CONTEST_ID = `comprehensive-${Date.now()}`
 
 describe('Comprehensive Grading Test', () => {
   beforeAll(async () => {
-    console.log('🧪 Setting up comprehensive grading test...')
 
     // Create test user
     await createTestUser(TEST_USER, 'admin')
-    console.log(`✅ Created test user: ${TEST_USER}`)
 
     // Create test contest with all 3 problems
     await createTestContest({
@@ -50,11 +48,9 @@ describe('Comprehensive Grading Test', () => {
       endTime: new Date(Date.now() + 7200000), // 2 hours for all submissions
       users: { [TEST_USER]: '1' }
     })
-    console.log(`✅ Created comprehensive test contest: ${TEST_CONTEST_ID}`)
   }, 30000)
 
   afterAll(async () => {
-    console.log('🧹 Cleaning up comprehensive test...')
 
     await safeCleanup(
       () => deleteTestContest(TEST_CONTEST_ID),
@@ -66,12 +62,9 @@ describe('Comprehensive Grading Test', () => {
       `delete user ${TEST_USER}`
     )
 
-    console.log('✅ Comprehensive cleanup completed')
   })
 
   it('verifies all 12 sample solutions get expected scores', async () => {
-    console.log('🔬 Testing all 12 sample solutions across 3 problems...')
-    console.log(`📊 Solutions: ${SAMPLE_SUBMISSIONS.length} total`)
 
     const results: Array<{
       solution: string
@@ -83,7 +76,6 @@ describe('Comprehensive Grading Test', () => {
 
     for (const [index, submission] of SAMPLE_SUBMISSIONS.entries()) {
       const solutionName = `${submission.problemName}-${submission.expectedScore}pts`
-      console.log(`\n[${index + 1}/12] 🧪 Testing ${solutionName}...`)
 
       try {
         let result
@@ -116,10 +108,8 @@ describe('Comprehensive Grading Test', () => {
           )
         }
 
-        console.log(`   📝 Submission created with ID: ${result.subId}`)
 
         // Wait for grading to complete
-        console.log(`   ⏳ Waiting for grading...`)
         const gradedSubmission = await waitForGradingComplete(result.subId, 120000)
 
         const actualVerdict = getSubmissionVerdict(gradedSubmission)
@@ -143,10 +133,8 @@ describe('Comprehensive Grading Test', () => {
         expect(gradedSubmission.subtaskScores).toEqual(submission.expectedSubtasks)
         expect(actualVerdict).toBe(submission.expectedVerdict)
 
-        console.log(`   ✅ ${solutionName}: ${gradedSubmission.totalScore}pts (${actualVerdict}) - PASS`)
 
       } catch (error) {
-        console.error(`   ❌ ${solutionName}: ERROR - ${error.message}`)
         results.push({
           solution: solutionName,
           expected: submission.expectedScore,
@@ -162,18 +150,13 @@ describe('Comprehensive Grading Test', () => {
     const passed = results.filter(r => r.status === 'PASS').length
     const failed = results.filter(r => r.status === 'FAIL').length
 
-    console.log('\n📊 COMPREHENSIVE TEST RESULTS:')
-    console.log('='.repeat(50))
 
     results.forEach(r => {
       const icon = r.status === 'PASS' ? '✅' : '❌'
-      console.log(`${icon} ${r.solution.padEnd(20)} ${r.actual}pts (${r.verdict})`)
     })
 
-    console.log(`\n🎯 Summary: ${passed}/${results.length} tests passed`)
 
     if (failed === 0) {
-      console.log('🎉 ALL TESTS PASSED! Grading system fully validated!')
     }
 
     // Overall test should pass only if all individual tests passed

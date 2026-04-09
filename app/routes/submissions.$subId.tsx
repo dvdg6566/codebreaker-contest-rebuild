@@ -10,6 +10,8 @@ import {
   Download,
   User,
   Calendar,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { getVerdictIcon } from "~/lib/verdict-utils";
 import { getLanguageDisplayName } from "~/lib/languages";
@@ -81,7 +83,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     code = await getSubmissionSource(subId, submission.language);
   }
 
-  // Build subtasks from submission data
   const subtaskScores = problem?.subtaskScores || [100];
   const subtaskDeps = problem?.subtaskDependency || ["1-" + (submission.verdicts?.length || 1)];
 
@@ -136,10 +137,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     };
   });
 
-  // Calculate max score
   const maxScore = subtaskScores.reduce((sum, s) => sum + s, 0);
 
-  // Get display language
   const languageDisplay = getLanguageDisplayName(submission.language);
 
   return {

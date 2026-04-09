@@ -38,7 +38,6 @@ export async function action({ request }: Route.ActionArgs) {
     const uploadType = formData.get("type") as UploadType;
     const file = formData.get("file") as File | null;
 
-    // Validate required fields
     if (!problemName) {
       return Response.json(
         { error: "problemName is required" },
@@ -54,13 +53,11 @@ export async function action({ request }: Route.ActionArgs) {
       return Response.json({ error: "file is required" }, { status: 400 });
     }
 
-    // Verify problem exists
     const problem = await getProblem(problemName);
     if (!problem) {
       return Response.json({ error: "Problem not found" }, { status: 404 });
     }
 
-    // Read file content
     const buffer = Buffer.from(await file.arrayBuffer());
 
     let result: UploadResult;

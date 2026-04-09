@@ -10,6 +10,8 @@ import {
   Copy,
   Download,
   Calendar,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { getVerdictIcon } from "~/lib/verdict-utils";
 import { getLanguageDisplayName } from "~/lib/languages";

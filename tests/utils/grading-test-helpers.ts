@@ -15,7 +15,6 @@ export async function createTestUser(username: string, role: string = 'member'):
   // Check if user already exists
   const existingUser = await getUser(username)
   if (existingUser) {
-    console.log(`ℹ️  User ${username} already exists, skipping creation`)
     return
   }
 
@@ -31,7 +30,6 @@ export async function createTestUser(username: string, role: string = 'member'):
  */
 export async function deleteTestUser(username: string): Promise<void> {
   if (username === 'admin') {
-    console.log(`ℹ️  Skipping deletion of ${username} user (real user)`)
     return
   }
   await deleteUser(username)

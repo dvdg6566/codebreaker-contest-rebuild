@@ -8,7 +8,8 @@ import {
   Eye,
   Calendar,
   FileText,
-  ChevronLeft
+  ChevronLeft,
+  CheckCircle2
 } from "lucide-react";
 import { getVerdictIcon } from "~/lib/verdict-utils";
 import { getLanguageDisplayName } from "~/lib/languages";

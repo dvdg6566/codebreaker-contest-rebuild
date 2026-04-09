@@ -23,16 +23,9 @@ export async function login(
   password: string,
   rememberMe = false
 ): Promise<{ session: SessionData; cookie: string }> {
-  // Authenticate with auth service (mock or Cognito)
   const authResult = await authenticate(username, password);
-
-  // Parse ID token to get user info
   const tokenInfo = parseIdToken(authResult.idToken);
-
-  // Get user role
   const role = await getUserRole(username);
-
-  // Calculate session duration in milliseconds
   const sessionDurationMs = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 6 * 60 * 60 * 1000; // 7 days or 6 hours
   const expiresAt = Date.now() + sessionDurationMs;
 

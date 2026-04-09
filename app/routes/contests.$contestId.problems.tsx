@@ -26,10 +26,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Contest not found", { status: 404 });
   }
 
-  // Check if user is in active contest session
   const contestStatus = await isUserInActiveContest(session.username, contestId);
-
-  // Get problems and user scores
   const problems = await getProblemsForContest(contest.problems);
   const userScores = await getUserContestScores(session.username, contestId);
 
